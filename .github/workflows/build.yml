@@ -26,4 +26,11 @@ jobs:
         distribution: temurin
         java-version: 8
     - name: Test Maven Build
-      run: mvn --show-version --no-transfer-progress install --define skipSBOM --define skipTests
+      run: |
+        mvn \
+        --show-version \
+        --no-transfer-progress \
+        install \
+        --define skipSBOM \
+        --define surefire.version=3.5.3 \
+        --define 'test=*Test,!GrizzlyAsyncStreamHandlerTest,!GrizzlyCloseCodeReasonMsgTest,!GrizzlyTransferListenerTest'
