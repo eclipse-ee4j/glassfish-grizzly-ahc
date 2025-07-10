@@ -40,7 +40,6 @@ import org.glassfish.grizzly.http.HttpRequestPacket;
 import org.glassfish.grizzly.memory.Buffers;
 import org.glassfish.grizzly.memory.MemoryManager;
 import org.glassfish.grizzly.utils.Charsets;
-import sun.misc.IOUtils;
 
 import static com.ning.http.client.providers.grizzly.PayloadGenerator.MAX_CHUNK_SIZE;
 import static com.ning.http.util.MiscUtils.isNonEmpty;
