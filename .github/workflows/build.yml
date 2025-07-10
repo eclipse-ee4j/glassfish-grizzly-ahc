@@ -32,5 +32,4 @@ jobs:
         --no-transfer-progress \
         install \
         --define skipSBOM \
-        --define surefire.version=3.5.3 \
         --define 'test=*Test,!GrizzlyAsyncStreamHandlerTest,!GrizzlyCloseCodeReasonMsgTest,!GrizzlyTransferListenerTest,!GrizzlyAsyncProviderBasicTest'

@@ -525,7 +525,7 @@
         <grizzly.version>2.4.4</grizzly.version>
         <maven.compiler.source>1.8</maven.compiler.source>
         <maven.compiler.target>1.8</maven.compiler.target>
-        <surefire.version>2.12</surefire.version>
+        <surefire.version>3.5.3</surefire.version>
         <jetty.version>9.4.17.v20190418</jetty.version>
     </properties>
 </project>
