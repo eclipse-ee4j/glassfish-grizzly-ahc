@@ -527,7 +527,7 @@
         <maven.compiler.target>1.8</maven.compiler.target>
         <maven.compiler.release>8</maven.compiler.release>
         <surefire.version>3.5.3</surefire.version>
-        <jetty.version>9.4.17.v20190418</jetty.version>
+        <jetty.version>9.4.18.v20190429</jetty.version>
     </properties>
 </project>
 
