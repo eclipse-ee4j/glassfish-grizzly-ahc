@@ -77,7 +77,7 @@ public abstract class ProxyTunnellingTest extends AbstractBasicTest {
         https_config.setSecurePort(port2);
         https_config.setOutputBufferSize(32768);
 
-        SslContextFactory sslContextFactory = new SslContextFactory();
+        SslContextFactory sslContextFactory = new SslContextFactory.Server();
         ClassLoader cl = getClass().getClassLoader();
         URL cacertsUrl = cl.getResource("ssltest-cacerts.jks");
         String trustStoreFile = new File(cacertsUrl.toURI()).getAbsolutePath();

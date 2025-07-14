@@ -56,7 +56,7 @@ public abstract class ConnectionCloseTest extends AbstractBasicTest {
         server = new Server();
         port1 = findFreePort();
 
-        SslContextFactory sslContextFactory = new SslContextFactory();
+        SslContextFactory sslContextFactory = new SslContextFactory.Server();
         ClassLoader cl = getClass().getClassLoader();
 
         URL cacertsUrl = cl.getResource("ssltest-cacerts.jks");

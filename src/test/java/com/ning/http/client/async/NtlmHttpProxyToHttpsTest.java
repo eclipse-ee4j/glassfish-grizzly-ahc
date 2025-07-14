@@ -93,7 +93,7 @@ public abstract class NtlmHttpProxyToHttpsTest extends AbstractBasicTest {
     https_config.addCustomizer(src);
 
     ClassLoader cl = getClass().getClassLoader();
-    SslContextFactory sslContextFactory = new SslContextFactory();
+    SslContextFactory sslContextFactory = new SslContextFactory.Server();
     URL cacertsUrl = cl.getResource("ssltest-cacerts.jks");
     String trustStoreFile = new File(cacertsUrl.toURI()).getAbsolutePath();
     sslContextFactory.setTrustStorePath(trustStoreFile);

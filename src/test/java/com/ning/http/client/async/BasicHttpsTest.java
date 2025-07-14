@@ -185,7 +185,7 @@ public abstract class BasicHttpsTest extends AbstractBasicTest {
         src.setStsIncludeSubDomains(true);
         https_config.addCustomizer(src);
 
-        SslContextFactory sslContextFactory = new SslContextFactory();
+        SslContextFactory sslContextFactory = new SslContextFactory.Server();
 
         ClassLoader cl = getClass().getClassLoader();
         // override system properties

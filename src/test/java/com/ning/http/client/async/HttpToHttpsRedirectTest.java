@@ -102,7 +102,7 @@ public abstract class HttpToHttpsRedirectTest extends AbstractBasicTest {
         src.setStsIncludeSubDomains(true);
         https_config.addCustomizer(src);
 
-        SslContextFactory sslContextFactory = new SslContextFactory();
+        SslContextFactory sslContextFactory = new SslContextFactory.Server();
         ClassLoader cl = getClass().getClassLoader();
         URL cacertsUrl = cl.getResource("ssltest-cacerts.jks");
         String trustStoreFile = new File(cacertsUrl.toURI()).getAbsolutePath();
