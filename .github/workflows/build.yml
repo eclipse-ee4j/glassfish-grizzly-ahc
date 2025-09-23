@@ -32,4 +32,4 @@ jobs:
         --no-transfer-progress \
         install \
         --define skipSBOM \
-        --define 'test=*Test,!GrizzlyAsyncStreamHandlerTest,!GrizzlyCloseCodeReasonMsgTest,!GrizzlyTransferListenerTest,!GrizzlyAsyncProviderBasicTest'
+        --define 'test=*Test,!GrizzlyCloseCodeReasonMsgTest,!GrizzlyTransferListenerTest,!GrizzlyAsyncProviderBasicTest'
