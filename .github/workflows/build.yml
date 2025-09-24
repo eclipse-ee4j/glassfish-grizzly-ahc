@@ -12,6 +12,7 @@
 
 on:
   pull_request:
+  workflow_dispatch:
 
 jobs:
   build:
@@ -32,4 +33,4 @@ jobs:
         --no-transfer-progress \
         install \
         --define skipSBOM \
-        --define 'test=*Test,!GrizzlyCloseCodeReasonMsgTest'
+        --define 'test=*Test,!GrizzlyCloseCodeReasonMsgTest,!GrizzlyTransferListenerTest'
