@@ -52,8 +52,10 @@ public abstract class CloseCodeReasonMessageTest extends TextMessageTest {
             client.prepareGet(getTargetUrl()).execute(new WebSocketUpgradeHandler.Builder().addWebSocketListener(new Listener(latch, text)).build()).get();
 
             latch.await();
-            final String[] parts = text.get().split(" ");
-            assertEquals(text.get(), "1001-Idle Timeout");
+            // code-reason
+            final String[] parts = text.get().split("[ -]");
+            assertEquals(Integer.parseInt(parts[0]), 1001);
+            assertEquals(parts[1], "java.util.concurrent.TimeoutException:");
         }
     }
 
