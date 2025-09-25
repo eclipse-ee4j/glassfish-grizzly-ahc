@@ -21,7 +21,6 @@ import com.ning.http.client.AsyncHttpClientConfig;
 import com.ning.http.client.async.ProviderUtil;
 import com.ning.http.client.ws.ProxyTunnellingTest;
 
-@Test
 public class GrizzlyProxyTunnellingTest extends ProxyTunnellingTest {
 
     @Override
