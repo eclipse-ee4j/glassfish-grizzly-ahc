@@ -1,4 +1,5 @@
 /*
+ * Copyright (c) 2025 Contributors to the Eclipse Foundation.
  * Copyright (c) 2017, 2018 Oracle and/or its affiliates. All rights reserved.
  * Copyright 2010-2015 Ning, Inc.
  *
@@ -924,14 +925,15 @@ public abstract class AsyncProvidersBasicTest extends AbstractBasicTest {
     public void asyncConnectInvalidFuture() throws Throwable {
         try (AsyncHttpClient client = getAsyncHttpClient(null)) {
             int dummyPort = findFreePort();
-            final AtomicInteger count = new AtomicInteger();
-            for (int i = 0; i < 20; i++) {
+            final int tryCount = 20;
+            final CountDownLatch count = new CountDownLatch(tryCount);
+            for (int i = 0; i < tryCount; i++) {
                 try {
                     Response response = client.preparePost(String.format("http://127.0.0.1:%d/", dummyPort))
                             .execute(new AsyncCompletionHandlerAdapter() {
                                 @Override
                                 public void onThrowable(Throwable t) {
-                                    count.incrementAndGet();
+                                    count.countDown();
                                 }
                             }).get();
                     assertNull(response, "Should have thrown ExecutionException");
@@ -942,7 +944,8 @@ public abstract class AsyncProvidersBasicTest extends AbstractBasicTest {
                     }
                 }
             }
-            assertEquals(count.get(), 20);
+            assertTrue(count.await(3000, TimeUnit.MILLISECONDS));
+            assertEquals(count.getCount(), 0);
         }
     }
 

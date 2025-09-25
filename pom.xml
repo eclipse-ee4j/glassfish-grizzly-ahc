@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
 
+    Copyright (c) 2025 Contributors to the Eclipse Foundation.
     Copyright (c) 2019, 2020 Oracle and/or its affiliates. All rights reserved.
 
     Licensed under the Apache License, Version 2.0 (the "License");
@@ -126,7 +127,7 @@
         <dependency>
             <groupId>com.google.guava</groupId>
             <artifactId>guava</artifactId>
-            <version>11.0.2</version>
+            <version>23.0</version>
             <optional>true</optional>
         </dependency>
 
@@ -140,7 +141,7 @@
         <dependency>
             <groupId>org.apache.logging.log4j</groupId>
             <artifactId>log4j-core</artifactId>
-            <version>2.25.1</version>
+            <version>2.25.2</version>
             <scope>test</scope>
         </dependency>
         <dependency>
@@ -227,7 +228,7 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
-                <version>3.14.0</version>
+                <version>3.14.1</version>
                 <configuration>
                     <maxmem>1024m</maxmem>
                 </configuration>
@@ -239,6 +240,9 @@
                 <configuration>
                     <!--<argLine>-Dorg.jboss.netty.tryUnsafe=true</argLine>-->
                     <redirectTestOutputToFile>${surefire.redirectTestOutputToFile}</redirectTestOutputToFile>
+                    <argLine>
+                        --add-opens java.base/java.lang=ALL-UNNAMED
+                    </argLine>
                 </configuration>
             </plugin>
             <plugin>
@@ -365,7 +369,7 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-javadoc-plugin</artifactId>
-                <version>3.11.2</version>
+                <version>3.11.3</version>
                 <configuration>
                     <aggregate>true</aggregate>
                     <doclint>none</doclint>
@@ -392,7 +396,7 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-javadoc-plugin</artifactId>
-                <version>3.11.2</version>
+                <version>3.11.3</version>
                 <configuration>
                     <aggregate>true</aggregate>
                     <source>${maven.compiler.source}</source>
@@ -447,10 +451,11 @@
                                 </goals>
                                 <configuration>
                                     <rules>
+                                        <requireJavaVersion>
+                                            <version>[17,)</version>
+                                        </requireJavaVersion>
                                         <requireMavenVersion>
-                                            <version>[3.0.4,)</version>
-                                            <message>Maven 3.0 through 3.0.3 inclusive does not pass
-                                                correct settings.xml to Maven Release Plugin.</message>
+                                            <version>[3.6.3,)</version>
                                         </requireMavenVersion>
                                     </rules>
                                 </configuration>
@@ -500,6 +505,9 @@
                         <artifactId>maven-surefire-plugin</artifactId>
                         <configuration>
                             <groups>standalone</groups>
+                            <argLine>
+                                --add-opens java.base/java.lang=ALL-UNNAMED
+                            </argLine>
                         </configuration>
                     </plugin>
                 </plugins>
@@ -514,6 +522,9 @@
                         <artifactId>maven-surefire-plugin</artifactId>
                         <configuration>
                             <groups>standalone, online</groups>
+                            <argLine>
+                                --add-opens java.base/java.lang=ALL-UNNAMED
+                            </argLine>
                         </configuration>
                     </plugin>
                 </plugins>
@@ -526,7 +537,7 @@
         <maven.compiler.source>1.8</maven.compiler.source>
         <maven.compiler.target>1.8</maven.compiler.target>
         <maven.compiler.release>8</maven.compiler.release>
-        <surefire.version>3.5.3</surefire.version>
+        <surefire.version>3.5.4</surefire.version>
         <jetty.version>9.4.58.v20250814</jetty.version>
     </properties>
 </project>

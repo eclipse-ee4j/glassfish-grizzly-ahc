@@ -1,4 +1,5 @@
 /*
+ * Copyright (c) 2025 Contributors to the Eclipse Foundation.
  * Copyright (c) 2017, 2018 Oracle and/or its affiliates. All rights reserved.
  * Copyright 2010 Ning, Inc.
  *
@@ -414,8 +415,8 @@ public abstract class AsyncStreamHandlerTest extends AbstractBasicTest {
         final AtomicReference<FluentCaseInsensitiveStringsMap> responseHeaders = new AtomicReference<>();
 
         try (AsyncHttpClient client = getAsyncHttpClient(null)) {
-            final String[] expected = { "GET", "HEAD", "OPTIONS", "POST" };
-            Future<String> f = client.prepareOptions("http://www.apache.org/").execute(new AsyncHandlerAdapter() {
+            final String[] expected = { "GET", "HEAD", "OPTIONS", "POST", "TRACE" };
+            Future<String> f = client.prepareOptions("https://www.apache.org/").execute(new AsyncHandlerAdapter() {
 
                 @Override
                 public STATE onHeadersReceived(HttpResponseHeaders content) throws Exception {
