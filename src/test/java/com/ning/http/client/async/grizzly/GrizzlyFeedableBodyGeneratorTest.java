@@ -27,6 +27,7 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URL;
+import java.nio.file.Files;
 import java.util.Random;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
@@ -356,7 +357,7 @@ public class GrizzlyFeedableBodyGeneratorTest {
 
 
     private void generateTempFile() throws IOException {
-        tempFile = File.createTempFile("feedable", null);
+        tempFile = Files.createTempFile("feedable", null).toFile();
         int total = 0;
         byte[] chunk = new byte[1024];
         Random r = new Random(System.currentTimeMillis());

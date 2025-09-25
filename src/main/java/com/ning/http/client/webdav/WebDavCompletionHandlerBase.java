@@ -252,6 +252,13 @@ public abstract class WebDavCompletionHandlerBase<T> implements AsyncHandler<T> 
 
     private Document readXMLResponse(InputStream stream) {
         DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
+        String FEATURE = "http://apache.org/xml/features/disallow-doctype-decl";
+        try {
+            factory.setFeature(FEATURE, true);
+        } catch (ParserConfigurationException e) {
+            throw new IllegalStateException("ParserConfigurationException was thrown. The feature '"
+                    + FEATURE + "' is not supported by your XML processor.", e);
+        }
         Document document = null;
         try {
             document = factory.newDocumentBuilder().parse(stream);

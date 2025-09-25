@@ -23,6 +23,7 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.nio.file.Files;
 import java.util.Enumeration;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -114,7 +115,7 @@ public abstract class ByteBufferCapacityTest extends AbstractBasicTest {
     public static File createTempFile(byte[] pattern, int repeat) throws IOException {
         TMP.mkdirs();
         TMP.deleteOnExit();
-        File tmpFile = File.createTempFile("tmpfile-", ".data", TMP);
+        File tmpFile = Files.createTempFile(TMP.toPath(), "tmpfile-", ".data").toFile();
         write(pattern, repeat, tmpFile);
 
         return tmpFile;

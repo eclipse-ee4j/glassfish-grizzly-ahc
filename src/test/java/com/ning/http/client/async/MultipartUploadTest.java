@@ -60,6 +60,7 @@ import java.io.Writer;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URL;
+import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -185,7 +186,7 @@ public abstract class MultipartUploadTest extends AbstractBasicTest {
         gzipped.add(false);
 
         boolean tmpFileCreated = false;
-        File tmpFile = File.createTempFile("textbytearray", ".txt");
+        File tmpFile = Files.createTempFile("textbytearray", ".txt").toFile();
         try (FileOutputStream os = new FileOutputStream(tmpFile)) {
             IOUtils.write(expectedContents.getBytes("UTF-8"), os);
             tmpFileCreated = true;
@@ -416,7 +417,7 @@ public abstract class MultipartUploadTest extends AbstractBasicTest {
                                 // Process the input stream
                                 OutputStream os = null;
                                 try {
-                                    File tmpFile = File.createTempFile(UUID.randomUUID().toString() + "_MockUploadServlet", ".tmp");
+                                    File tmpFile = Files.createTempFile(UUID.randomUUID().toString() + "_MockUploadServlet", ".tmp").toFile();
                                     tmpFile.deleteOnExit();
                                     os = new FileOutputStream(tmpFile);
                                     byte[] buffer = new byte[4096];
