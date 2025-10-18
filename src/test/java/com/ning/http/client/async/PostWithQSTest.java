@@ -1,4 +1,5 @@
 /*
+ * Copyright (c) 2025 Contributors to the Eclipse Foundation.
  * Copyright (c) 2017, 2018 Oracle and/or its affiliates. All rights reserved.
  * Copyright 2010 Ning, Inc.
  *
@@ -23,16 +24,20 @@ import com.ning.http.client.AsyncCompletionHandlerBase;
 import com.ning.http.client.AsyncHttpClient;
 import com.ning.http.client.HttpResponseStatus;
 import com.ning.http.client.Response;
+import org.eclipse.jetty.http.HttpStatus;
+import org.eclipse.jetty.io.Content;
+import org.eclipse.jetty.server.Handler;
 import org.eclipse.jetty.server.Request;
-import org.eclipse.jetty.server.handler.AbstractHandler;
+import org.eclipse.jetty.util.Callback;
 import org.testng.annotations.Test;
 
-import javax.servlet.ServletException;
-import javax.servlet.ServletInputStream;
-import javax.servlet.ServletOutputStream;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
+import java.io.BufferedReader;
+import java.io.BufferedWriter;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.io.OutputStream;
+import java.io.OutputStreamWriter;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
@@ -51,25 +56,32 @@ public abstract class PostWithQSTest extends AbstractBasicTest {
     /**
      * POST with QS server part.
      */
-    private class PostWithQSHandler extends AbstractHandler {
-        public void handle(String s, Request r, HttpServletRequest request, HttpServletResponse response) throws IOException, ServletException {
+    private class PostWithQSHandler extends Handler.Abstract {
+        @Override
+        public boolean handle(Request request, org.eclipse.jetty.server.Response response, Callback callback)
+                throws Exception {
             if ("POST".equalsIgnoreCase(request.getMethod())) {
-                String qs = request.getQueryString();
-                if (isNonEmpty(qs) && request.getContentLength() == 3) {
-                    ServletInputStream is = request.getInputStream();
-                    response.setStatus(HttpServletResponse.SC_OK);
-                    byte buf[] = new byte[is.available()];
-                    is.readLine(buf, 0, is.available());
-                    ServletOutputStream os = response.getOutputStream();
-                    os.println(new String(buf));
-                    os.flush();
-                    os.close();
+                String qs = request.getHttpURI().getQuery();
+                if (isNonEmpty(qs) && request.getLength() == 3) {
+                    try (final InputStream is = Content.Source.asInputStream(request);
+                         final InputStreamReader isr = new InputStreamReader(is);
+                         final BufferedReader reader = new BufferedReader(isr);
+                         final OutputStream os = Content.Sink.asOutputStream(response);
+                         final OutputStreamWriter osw = new OutputStreamWriter(os);
+                         final BufferedWriter writer = new BufferedWriter(osw)) {
+                        final String line = reader.readLine();
+                        writer.write(line + "\r\n");
+                        os.flush();
+                    }
                 } else {
-                    response.sendError(HttpServletResponse.SC_NOT_ACCEPTABLE);
+                    org.eclipse.jetty.server.Response.writeError(request, response, callback,
+                                                                 HttpStatus.NOT_ACCEPTABLE_406);
                 }
             } else { // this handler is to handle POST request
-                response.sendError(HttpServletResponse.SC_FORBIDDEN);
+                org.eclipse.jetty.server.Response.writeError(request, response, callback, HttpStatus.FORBIDDEN_403);
             }
+            callback.succeeded();
+            return true;
         }
     }
 
@@ -79,7 +91,7 @@ public abstract class PostWithQSTest extends AbstractBasicTest {
             Future<Response> f = client.preparePost("http://127.0.0.1:" + port1 + "/?a=b").setBody("abc".getBytes()).execute();
             Response resp = f.get(3, TimeUnit.SECONDS);
             assertNotNull(resp);
-            assertEquals(resp.getStatusCode(), HttpServletResponse.SC_OK);
+            assertEquals(resp.getStatusCode(), 200);
         }
     }
 
@@ -99,7 +111,7 @@ public abstract class PostWithQSTest extends AbstractBasicTest {
             });
             Response resp = f.get(3, TimeUnit.SECONDS);
             assertNotNull(resp);
-            assertEquals(resp.getStatusCode(), HttpServletResponse.SC_OK);
+            assertEquals(resp.getStatusCode(), 200);
         }
     }
 
@@ -119,7 +131,7 @@ public abstract class PostWithQSTest extends AbstractBasicTest {
             });
             Response resp = f.get(3, TimeUnit.SECONDS);
             assertNotNull(resp);
-            assertEquals(resp.getStatusCode(), HttpServletResponse.SC_OK);
+            assertEquals(resp.getStatusCode(), 200);
         }
     }
     
@@ -139,12 +151,12 @@ public abstract class PostWithQSTest extends AbstractBasicTest {
             });
             Response resp = f.get(3, TimeUnit.SECONDS);
             assertNotNull(resp);
-            assertEquals(resp.getStatusCode(), HttpServletResponse.SC_OK);
+            assertEquals(resp.getStatusCode(), 200);
         }
     }
 
     @Override
-    public AbstractHandler configureHandler() throws Exception {
+    public Handler.Abstract configureHandler() throws Exception {
         return new PostWithQSHandler();
     }
 }

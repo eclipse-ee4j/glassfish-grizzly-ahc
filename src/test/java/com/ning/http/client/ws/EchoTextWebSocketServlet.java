@@ -1,4 +1,5 @@
 /*
+ * Copyright 2025 Contributors to the Eclipse Foundation.
  * Copyright (c) 2018 Oracle and/or its affiliates. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -18,13 +19,12 @@
 
 package com.ning.http.client.ws;
 
-import org.eclipse.jetty.websocket.servlet.WebSocketServlet;
-import org.eclipse.jetty.websocket.servlet.WebSocketServletFactory;
+import org.eclipse.jetty.ee11.websocket.server.JettyWebSocketServlet;
+import org.eclipse.jetty.ee11.websocket.server.JettyWebSocketServletFactory;
 
-public class EchoTextWebSocketServlet extends WebSocketServlet {
+public class EchoTextWebSocketServlet extends JettyWebSocketServlet {
     @Override
-    public void configure(WebSocketServletFactory factory) {
-        factory.getPolicy().setIdleTimeout(10*1000);
+    public void configure(JettyWebSocketServletFactory factory) {
         factory.register(EchoTextWebSocket.class);
     }
 }

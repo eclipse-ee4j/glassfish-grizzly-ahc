@@ -1,4 +1,5 @@
 /*
+ * Copyright (c) 2025 Contributors to the Eclipse Foundation.
  * Copyright (c) 2017, 2018 Oracle and/or its affiliates. All rights reserved.
  * Copyright 2010 Ning, Inc.
  *
@@ -31,12 +32,10 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import javax.servlet.ServletException;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
-
+import org.eclipse.jetty.http.HttpStatus;
+import org.eclipse.jetty.server.Handler;
 import org.eclipse.jetty.server.Request;
-import org.eclipse.jetty.server.handler.AbstractHandler;
+import org.eclipse.jetty.util.Callback;
 import org.testng.annotations.Test;
 
 import com.ning.http.client.AsyncHandler;
@@ -52,20 +51,23 @@ import com.ning.http.client.Response;
  * @author Hubert Iwaniuk
  */
 public abstract class EmptyBodyTest extends AbstractBasicTest {
-    private class NoBodyResponseHandler extends AbstractHandler {
-        public void handle(String s, Request request, HttpServletRequest req, HttpServletResponse resp) throws IOException, ServletException {
+    private class NoBodyResponseHandler extends Handler.Abstract {
+        @Override
+        public boolean handle(Request request, org.eclipse.jetty.server.Response response, Callback callback)
+                throws Exception {
 
-            if (!req.getMethod().equalsIgnoreCase("PUT")) {
-                resp.setStatus(HttpServletResponse.SC_OK);
+            if (!request.getMethod().equalsIgnoreCase("PUT")) {
+                response.setStatus(HttpStatus.OK_200);
             } else {
-                resp.setStatus(204);
+                response.setStatus(HttpStatus.NO_CONTENT_204);
             }
-            request.setHandled(true);
+            callback.succeeded();
+            return true;
         }
     }
 
     @Override
-    public AbstractHandler configureHandler() throws Exception {
+    public Handler.Abstract configureHandler() throws Exception {
         return new NoBodyResponseHandler();
     }
 

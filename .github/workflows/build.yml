@@ -32,4 +32,5 @@ jobs:
         --no-transfer-progress \
         install \
         --define skipSBOM \
-        --define 'test=*Test,!GrizzlyTransferListenerTest'
+        --define forkCount=1 \
+        --define reuseForks=false

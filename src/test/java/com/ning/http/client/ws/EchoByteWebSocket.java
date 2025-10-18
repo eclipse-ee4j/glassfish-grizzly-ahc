@@ -1,4 +1,5 @@
 /*
+ * Copyright 2025 Contributors to the Eclipse Foundation.
  * Copyright (c) 2018 Oracle and/or its affiliates. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -18,26 +19,38 @@
 
 package com.ning.http.client.ws;
 
-import org.eclipse.jetty.websocket.api.WebSocketAdapter;
+import org.eclipse.jetty.websocket.api.Callback;
+import org.eclipse.jetty.websocket.api.Session;
 
-import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.time.Duration;
 
-public class EchoByteWebSocket extends WebSocketAdapter {
+public class EchoByteWebSocket implements Session.Listener {
+
+    private Session session;
 
     @Override
-    public void onWebSocketBinary(byte[] payload, int offset, int len) {
-        if (isConnected()) {
-            try {
-                getRemote().sendBytes(ByteBuffer.wrap(payload, offset, len));
-            } catch (IOException e) {
-                try {
-                    getRemote().sendString("FAIL");
-                } catch (IOException ex) {
-                    ex.printStackTrace();
-                }
-            }
+    public void onWebSocketOpen(Session session) {
+        this.session = session;
+        this.session.setIdleTimeout(Duration.ofSeconds(10));
+        this.session.demand();
+    }
+
+    @Override
+    public void onWebSocketBinary(ByteBuffer payload, Callback callback) {
+        if (isNotConnected()) {
+            callback.succeed();
+            session.demand();
+            return;
         }
 
+        session.sendBinary(payload, Callback.from(() -> {
+            callback.succeed();
+            session.demand();
+        }, Throwable::printStackTrace));
+    }
+
+    private boolean isNotConnected() {
+        return session == null || !session.isOpen();
     }
 }

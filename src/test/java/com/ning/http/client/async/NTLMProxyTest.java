@@ -1,4 +1,5 @@
 /*
+ * Copyright (c) 2025 Contributors to the Eclipse Foundation.
  * Copyright (c) 2017, 2018 Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2015 AsyncHttpClient Project. All rights reserved.
  *
@@ -28,46 +29,50 @@ import java.net.UnknownHostException;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 
-import javax.servlet.ServletException;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
-
-import org.eclipse.jetty.server.handler.AbstractHandler;
-import org.eclipse.jetty.server.handler.HandlerWrapper;
+import org.eclipse.jetty.http.HttpFields;
+import org.eclipse.jetty.http.HttpHeader;
+import org.eclipse.jetty.http.HttpStatus;
+import org.eclipse.jetty.io.Content;
+import org.eclipse.jetty.server.Handler;
+import org.eclipse.jetty.util.Callback;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
 public abstract class NTLMProxyTest extends AbstractBasicTest {
 
-    public static class NTLMProxyHandler extends HandlerWrapper {
+    public static class NTLMProxyHandler extends Handler.Abstract {
 
         @Override
-        public void handle(String pathInContext, org.eclipse.jetty.server.Request request, HttpServletRequest httpRequest,
-                HttpServletResponse httpResponse) throws IOException, ServletException {
+        public boolean handle(org.eclipse.jetty.server.Request request, org.eclipse.jetty.server.Response response,
+                              Callback callback) throws Exception {
+            final HttpFields requestHeaders = request.getHeaders();
+            final HttpFields.Mutable responseHeaders = response.getHeaders();
 
-            String authorization = httpRequest.getHeader("Proxy-Authorization");
+            final String authorization = requestHeaders.get(HttpHeader.PROXY_AUTHORIZATION);
             if (authorization == null) {
-                httpResponse.setStatus(407);
-                httpResponse.setHeader("Proxy-Authenticate", "NTLM");
+                response.setStatus(HttpStatus.PROXY_AUTHENTICATION_REQUIRED_407);
+                responseHeaders.put(HttpHeader.PROXY_AUTHENTICATE, "NTLM");
 
             } else if (authorization.equals("NTLM TlRMTVNTUAABAAAAAYIIogAAAAAoAAAAAAAAACgAAAAFASgKAAAADw==")) {
-                httpResponse.setStatus(407);
-                httpResponse.setHeader("Proxy-Authenticate", "NTLM TlRMTVNTUAACAAAAAAAAACgAAAABggAAU3J2Tm9uY2UAAAAAAAAAAA==");
+                response.setStatus(HttpStatus.PROXY_AUTHENTICATION_REQUIRED_407);
+                responseHeaders.put(HttpHeader.PROXY_AUTHENTICATE, "NTLM TlRMTVNTUAACAAAAAAAAACgAAAABggAAU3J2Tm9uY2UAAAAAAAAAAA==");
 
             } else if (authorization
                     .equals("NTLM TlRMTVNTUAADAAAAGAAYAEgAAAAYABgAYAAAABQAFAB4AAAADAAMAIwAAAASABIAmAAAAAAAAACqAAAAAYIAAgUBKAoAAAAPrYfKbe/jRoW5xDxHeoxC1gBmfWiS5+iX4OAN4xBKG/IFPwfH3agtPEia6YnhsADTVQBSAFMAQQAtAE0ASQBOAE8AUgBaAGEAcABoAG8AZABMAGkAZwBoAHQAQwBpAHQAeQA=")) {
-                httpResponse.setStatus(200);
+                response.setStatus(HttpStatus.OK_200);
             } else {
-                httpResponse.setStatus(401);
+                response.setStatus(HttpStatus.UNAUTHORIZED_401);
             }
-            httpResponse.setContentLength(0);
-            httpResponse.getOutputStream().flush();
-            httpResponse.getOutputStream().close();
+            responseHeaders.put(HttpHeader.CONTENT_LENGTH, 0L);
+            Content.Sink.asOutputStream(response).flush();
+            Content.Sink.asOutputStream(response).close();
+            callback.succeeded();
+            return true;
         }
     }
 
     @Override
-    public AbstractHandler configureHandler() throws Exception {
+    public Handler.Abstract configureHandler() throws Exception {
         return new NTLMProxyHandler();
     }
 

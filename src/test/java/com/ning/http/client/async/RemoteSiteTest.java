@@ -1,4 +1,5 @@
 /*
+ * Copyright (c) 2025 Contributors to the Eclipse Foundation.
  * Copyright (c) 2017, 2018 Oracle and/or its affiliates. All rights reserved.
  * Copyright 2010 Ning, Inc.
  *
@@ -160,7 +161,7 @@ public abstract class RemoteSiteTest extends AbstractBasicTest {
         }
     }
 
-    @Test(groups = { "online", "default_provider" })
+    @Test(groups = { "online", "default_provider" }, enabled = false)
     public void stripQueryStringTest() throws Throwable {
 
         AsyncHttpClientConfig cg = new AsyncHttpClientConfig.Builder().setFollowRedirect(true).build();

@@ -1,4 +1,5 @@
 /*
+ * Copyright (c) 2025 Contributors to the Eclipse Foundation.
  * Copyright (c) 2017, 2018 Oracle and/or its affiliates. All rights reserved.
  * Copyright 2010 Ning, Inc.
  *
@@ -20,13 +21,14 @@ package com.ning.http.client.async;
 import com.ning.http.client.AsyncHttpClient;
 import com.ning.http.client.FluentCaseInsensitiveStringsMap;
 import com.ning.http.client.Response;
+import org.eclipse.jetty.http.HttpFields;
+import org.eclipse.jetty.http.HttpStatus;
+import org.eclipse.jetty.io.Content;
+import org.eclipse.jetty.server.Handler;
 import org.eclipse.jetty.server.Request;
-import org.eclipse.jetty.server.handler.AbstractHandler;
+import org.eclipse.jetty.util.Callback;
 import org.testng.annotations.Test;
 
-import javax.servlet.ServletException;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.concurrent.ExecutionException;
@@ -37,19 +39,25 @@ import static org.testng.Assert.assertNotNull;
 
 public abstract class InputStreamTest extends AbstractBasicTest {
 
-    private class InputStreamHandler extends AbstractHandler {
-        public void handle(String s, Request r, HttpServletRequest request, HttpServletResponse response) throws IOException, ServletException {
+    private class InputStreamHandler extends Handler.Abstract {
+        @Override
+        public boolean handle(Request request, org.eclipse.jetty.server.Response response, Callback callback)
+                throws Exception {
             if ("POST".equalsIgnoreCase(request.getMethod())) {
                 byte[] b = new byte[3];
-                request.getInputStream().read(b, 0, 3);
-
-                response.setStatus(HttpServletResponse.SC_OK);
-                response.addHeader("X-Param", new String(b));
+                try (final InputStream in = Content.Source.asInputStream(request)) {
+                    in.read(b, 0, 3);
+                }
+                response.setStatus(HttpStatus.OK_200);
+                final HttpFields.Mutable responseHeaders = response.getHeaders();
+                responseHeaders.put("X-Param", new String(b));
             } else { // this handler is to handle POST request
-                response.sendError(HttpServletResponse.SC_FORBIDDEN);
+                org.eclipse.jetty.server.Response.writeError(request, response, callback, HttpStatus.FORBIDDEN_403);
             }
-            response.getOutputStream().flush();
-            response.getOutputStream().close();
+            Content.Sink.asOutputStream(response).flush();
+            Content.Sink.asOutputStream(response).close();
+            callback.succeeded();
+            return true;
         }
     }
 
@@ -87,13 +95,13 @@ public abstract class InputStreamTest extends AbstractBasicTest {
 
             Response resp = client.preparePost(getTargetUrl()).setHeaders(h).setBody(is).execute().get();
             assertNotNull(resp);
-            assertEquals(resp.getStatusCode(), HttpServletResponse.SC_OK);
+            assertEquals(resp.getStatusCode(), 200);
             assertEquals(resp.getHeader("X-Param"), "abc");
         }
     }
 
     @Override
-    public AbstractHandler configureHandler() throws Exception {
+    public Handler.Abstract configureHandler() throws Exception {
         return new InputStreamHandler();
     }
 }

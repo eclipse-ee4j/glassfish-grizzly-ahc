@@ -1,4 +1,5 @@
 /*
+ * Copyright (c) 2025 Contributors to the Eclipse Foundation.
  * Copyright (c) 2017, 2018 Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2010-2012 Sonatype, Inc. All rights reserved.
  *
@@ -24,16 +25,15 @@ import com.ning.http.client.filter.FilterContext;
 import com.ning.http.client.filter.FilterException;
 import com.ning.http.client.filter.ResponseFilter;
 
-import org.eclipse.jetty.server.handler.AbstractHandler;
+import org.eclipse.jetty.http.HttpField;
+import org.eclipse.jetty.http.HttpFields;
+import org.eclipse.jetty.http.HttpStatus;
+import org.eclipse.jetty.io.Content;
+import org.eclipse.jetty.server.Handler;
+import org.eclipse.jetty.util.Callback;
 import org.testng.annotations.Test;
 
-import javax.servlet.ServletException;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
-
-import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Enumeration;
 import java.util.List;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
@@ -43,25 +43,28 @@ import static org.testng.Assert.*;
 
 public abstract class FilterTest extends AbstractBasicTest {
 
-    private class BasicHandler extends AbstractHandler {
+    private class BasicHandler extends Handler.Abstract {
 
-        public void handle(String s, org.eclipse.jetty.server.Request r, HttpServletRequest httpRequest, HttpServletResponse httpResponse) throws IOException, ServletException {
+        @Override
+        public boolean handle(org.eclipse.jetty.server.Request request, org.eclipse.jetty.server.Response response,
+                              Callback callback) throws Exception {
 
-            Enumeration<?> e = httpRequest.getHeaderNames();
-            String param;
-            while (e.hasMoreElements()) {
-                param = e.nextElement().toString();
-                httpResponse.addHeader(param, httpRequest.getHeader(param));
+            final HttpFields requestHeaders = request.getHeaders();
+            final HttpFields.Mutable responseHeaders = response.getHeaders();
+            for (final HttpField field : requestHeaders) {
+                responseHeaders.put(field.getName(), field.getValue());
             }
 
-            httpResponse.setStatus(200);
-            httpResponse.getOutputStream().flush();
-            httpResponse.getOutputStream().close();
+            response.setStatus(HttpStatus.OK_200);
+            Content.Sink.asOutputStream(response).flush();
+            Content.Sink.asOutputStream(response).close();
+            callback.succeeded();
+            return true;
         }
     }
 
     @Override
-    public AbstractHandler configureHandler() throws Exception {
+    public Handler.Abstract configureHandler() throws Exception {
         return new BasicHandler();
     }
 

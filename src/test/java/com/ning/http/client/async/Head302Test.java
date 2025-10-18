@@ -1,4 +1,5 @@
 /*
+ * Copyright (c) 2025 Contributors to the Eclipse Foundation.
  * Copyright (c) 2017, 2018 Oracle and/or its affiliates. All rights reserved.
  * Copyright 2010 Ning, Inc.
  *
@@ -24,11 +25,11 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
-import javax.servlet.ServletException;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
-
-import org.eclipse.jetty.server.handler.AbstractHandler;
+import org.eclipse.jetty.http.HttpFields;
+import org.eclipse.jetty.http.HttpHeader;
+import org.eclipse.jetty.http.HttpStatus;
+import org.eclipse.jetty.server.Handler;
+import org.eclipse.jetty.util.Callback;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
@@ -47,18 +48,25 @@ public abstract class Head302Test extends AbstractBasicTest {
     /**
      * Handler that does Found (302) in response to HEAD method.
      */
-    private class Head302handler extends AbstractHandler {
-        public void handle(String s, org.eclipse.jetty.server.Request r, HttpServletRequest request, HttpServletResponse response) throws IOException, ServletException {
+    private class Head302handler extends Handler.Abstract {
+        @Override
+        public boolean handle(org.eclipse.jetty.server.Request request, org.eclipse.jetty.server.Response response,
+                              Callback callback)
+                throws Exception {
             if ("HEAD".equalsIgnoreCase(request.getMethod())) {
-                if (request.getPathInfo().endsWith("_moved")) {
-                    response.setStatus(HttpServletResponse.SC_OK);
+                if (org.eclipse.jetty.server.Request.getPathInContext(request).endsWith("_moved")) {
+                    response.setStatus(HttpStatus.OK_200);
                 } else {
-                    response.setStatus(HttpServletResponse.SC_FOUND); // 302
-                    response.setHeader("Location", request.getPathInfo() + "_moved");
+                    response.setStatus(HttpStatus.FOUND_302); // 302
+                    final HttpFields.Mutable responseHeaders = response.getHeaders();
+                    responseHeaders.put(HttpHeader.LOCATION,
+                                        org.eclipse.jetty.server.Request.getPathInContext(request) + "_moved");
                 }
             } else { // this handler is to handle HEAD reqeust
-                response.setStatus(HttpServletResponse.SC_FORBIDDEN);
+                response.setStatus(HttpStatus.FORBIDDEN_403);
             }
+            callback.succeeded();
+            return true;
         }
     }
 
@@ -83,7 +91,7 @@ public abstract class Head302Test extends AbstractBasicTest {
     }
 
     @Override
-    public AbstractHandler configureHandler() throws Exception {
+    public Handler.Abstract configureHandler() throws Exception {
         return new Head302handler();
     }
 }

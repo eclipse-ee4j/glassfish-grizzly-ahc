@@ -1,4 +1,5 @@
 /*
+ * Copyright (c) 2025 Contributors to the Eclipse Foundation.
  * Copyright (c) 2017, 2018 Oracle and/or its affiliates. All rights reserved.
  * Copyright 2010 Ning, Inc.
  *
@@ -19,28 +20,26 @@ package com.ning.http.client.async;
 
 import com.ning.http.client.AsyncHttpClient;
 import com.ning.http.client.AsyncHttpClientConfig;
+import org.eclipse.jetty.http.HttpStatus;
+import org.eclipse.jetty.io.Content;
+import org.eclipse.jetty.server.Handler;
 import org.eclipse.jetty.server.Request;
 import org.eclipse.jetty.server.Server;
 import org.eclipse.jetty.server.ServerConnector;
-import org.eclipse.jetty.server.handler.HandlerWrapper;
+import org.eclipse.jetty.util.Callback;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
-import javax.servlet.ServletException;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
-import java.io.IOException;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 public abstract class IdleStateHandlerTest extends AbstractBasicTest {
     private final AtomicBoolean isSet = new AtomicBoolean(false);
 
-    private class IdleStateHandler extends HandlerWrapper {
+    private class IdleStateHandler extends Handler.Abstract {
 
-        public void handle(String s,
-                           Request r,
-                           HttpServletRequest httpRequest,
-                           HttpServletResponse httpResponse) throws IOException, ServletException {
+        @Override
+        public boolean handle(Request request, org.eclipse.jetty.server.Response response, Callback callback)
+                throws Exception {
 
             try {
                 Thread.sleep(20 * 1000);
@@ -48,9 +47,11 @@ public abstract class IdleStateHandlerTest extends AbstractBasicTest {
             catch (InterruptedException e) {
                 e.printStackTrace();
             }
-            httpResponse.setStatus(200);
-            httpResponse.getOutputStream().flush();
-            httpResponse.getOutputStream().close();
+            response.setStatus(HttpStatus.OK_200);
+            Content.Sink.asOutputStream(response).flush();
+            Content.Sink.asOutputStream(response).close();
+            callback.succeeded();
+            return true;
         }
     }
 

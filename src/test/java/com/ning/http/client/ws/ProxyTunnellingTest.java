@@ -1,4 +1,5 @@
 /*
+ * Copyright 2025 Contributors to the Eclipse Foundation.
  * Copyright (c) 2017, 2018 Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2014 AsyncHttpClient Project. All rights reserved.
  *
@@ -16,18 +17,19 @@ package com.ning.http.client.ws;
 
 import static org.testng.Assert.assertEquals;
 
+import org.eclipse.jetty.ee11.servlet.ServletContextHandler;
+import org.eclipse.jetty.ee11.servlet.ServletHolder;
+import org.eclipse.jetty.ee11.websocket.server.JettyWebSocketServlet;
+import org.eclipse.jetty.ee11.websocket.server.config.JettyWebSocketServletContainerInitializer;
 import org.eclipse.jetty.http.HttpVersion;
-import org.eclipse.jetty.proxy.ConnectHandler;
 import org.eclipse.jetty.server.HttpConfiguration;
 import org.eclipse.jetty.server.HttpConnectionFactory;
 import org.eclipse.jetty.server.SecureRequestCustomizer;
 import org.eclipse.jetty.server.Server;
 import org.eclipse.jetty.server.ServerConnector;
 import org.eclipse.jetty.server.SslConnectionFactory;
-import org.eclipse.jetty.servlet.ServletContextHandler;
-import org.eclipse.jetty.servlet.ServletHolder;
+import org.eclipse.jetty.server.handler.ConnectHandler;
 import org.eclipse.jetty.util.ssl.SslContextFactory;
-import org.eclipse.jetty.websocket.servlet.WebSocketServlet;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.Test;
 
@@ -72,6 +74,7 @@ public abstract class ProxyTunnellingTest extends AbstractBasicTest {
         server2.setHandler(context);
         ServletHolder echo = new ServletHolder(getWebSocketHandler());
         context.addServlet(echo, "/*");
+        JettyWebSocketServletContainerInitializer.configure(context, null);
         server2.start();
         log.info("Local HTTP server started successfully");
 
@@ -94,7 +97,7 @@ public abstract class ProxyTunnellingTest extends AbstractBasicTest {
         src.setStsIncludeSubDomains(true);
         https_config.addCustomizer(src);
 
-        SslContextFactory sslContextFactory = new SslContextFactory.Server();
+        SslContextFactory.Server sslContextFactory = new SslContextFactory.Server();
         ClassLoader cl = getClass().getClassLoader();
         URL cacertsUrl = cl.getResource("ssltest-cacerts.jks");
         String trustStoreFile = new File(cacertsUrl.toURI()).getAbsolutePath();
@@ -121,7 +124,7 @@ public abstract class ProxyTunnellingTest extends AbstractBasicTest {
     }
 
     @Override
-    public WebSocketServlet getWebSocketHandler() {
+    public JettyWebSocketServlet getWebSocketHandler() {
         return new EchoTextWebSocketServlet();
     }
     

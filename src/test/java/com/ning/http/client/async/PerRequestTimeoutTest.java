@@ -1,4 +1,5 @@
 /*
+ * Copyright (c) 2025 Contributors to the Eclipse Foundation.
  * Copyright (c) 2017, 2018 Oracle and/or its affiliates. All rights reserved.
  * Copyright 2010 Ning, Inc.
  *
@@ -24,15 +25,13 @@ import com.ning.http.client.AsyncHttpClient;
 import com.ning.http.client.AsyncHttpClientConfig;
 import com.ning.http.client.HttpResponseBodyPart;
 import com.ning.http.client.Response;
+import org.eclipse.jetty.http.HttpStatus;
+import org.eclipse.jetty.io.Content;
+import org.eclipse.jetty.server.Handler;
 import org.eclipse.jetty.server.Request;
-import org.eclipse.jetty.server.handler.AbstractHandler;
-import org.eclipse.jetty.server.handler.HandlerWrapper;
+import org.eclipse.jetty.util.Callback;
 import org.testng.annotations.Test;
 
-import javax.servlet.AsyncContext;
-import javax.servlet.ServletException;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
@@ -56,20 +55,21 @@ public abstract class PerRequestTimeoutTest extends AbstractBasicTest {
     protected abstract void checkTimeoutMessage(String message);
 
     @Override
-    public AbstractHandler configureHandler() throws Exception {
+    public Handler.Abstract configureHandler() throws Exception {
         return new SlowHandler();
     }
 
-    private class SlowHandler extends HandlerWrapper {
-        public void handle(String target, Request baseRequest, HttpServletRequest request, final HttpServletResponse response) throws IOException, ServletException {
-            response.setStatus(HttpServletResponse.SC_OK);
-            final AsyncContext continuation = request.startAsync();
+    private class SlowHandler extends Handler.Abstract {
+        @Override
+        public boolean handle(Request request, org.eclipse.jetty.server.Response response, Callback callback)
+                throws Exception {
+            response.setStatus(HttpStatus.OK_200);
             new Thread(new Runnable() {
                 public void run() {
                     try {
                         Thread.sleep(1500);
-                        response.getOutputStream().print(MSG);
-                        response.getOutputStream().flush();
+                        Content.Sink.asOutputStream(response).write(MSG.getBytes());
+                        Content.Sink.asOutputStream(response).flush();
                     } catch (InterruptedException e) {
                         log.error(e.getMessage(), e);
                     } catch (IOException e) {
@@ -81,9 +81,9 @@ public abstract class PerRequestTimeoutTest extends AbstractBasicTest {
                 public void run() {
                     try {
                         Thread.sleep(3000);
-                        response.getOutputStream().print(MSG);
-                        response.getOutputStream().flush();
-                        continuation.complete();
+                        Content.Sink.asOutputStream(response).write(MSG.getBytes());
+                        Content.Sink.asOutputStream(response).flush();
+                        callback.succeeded();
                     } catch (InterruptedException e) {
                         log.error(e.getMessage(), e);
                     } catch (IOException e) {
@@ -91,7 +91,7 @@ public abstract class PerRequestTimeoutTest extends AbstractBasicTest {
                     }
                 }
             }).start();
-            baseRequest.setHandled(true);
+            return true;
         }
     }
 

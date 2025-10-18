@@ -1,4 +1,5 @@
 /*
+ * Copyright 2025 Contributors to the Eclipse Foundation.
  * Copyright (c) 2017, 2018 Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2010-2012 Sonatype, Inc. All rights reserved.
  *
@@ -18,7 +19,7 @@ import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertTrue;
 import static org.testng.Assert.fail;
 
-import org.eclipse.jetty.websocket.servlet.WebSocketServlet;
+import org.eclipse.jetty.ee11.websocket.server.JettyWebSocketServlet;
 import org.testng.annotations.Test;
 
 import com.ning.http.client.AsyncHttpClient;
@@ -33,7 +34,7 @@ import java.util.concurrent.atomic.AtomicReference;
 public abstract class TextMessageTest extends AbstractBasicTest {
 
     @Override
-    public WebSocketServlet getWebSocketHandler() {
+    public JettyWebSocketServlet getWebSocketHandler() {
         return new EchoTextWebSocketServlet();
     }
 

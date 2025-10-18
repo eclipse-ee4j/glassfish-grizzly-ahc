@@ -45,10 +45,6 @@ import java.util.concurrent.atomic.AtomicReference;
 
 public abstract class AsyncStreamHandlerTest extends AbstractBasicTest {
     private final static String RESPONSE = "param_1_";
-    
-    private String jetty8ContentTypeMadness(String saneValue) {
-        return saneValue.replace(" ", "");
-    }
 
     @Test(groups = { "standalone", "default_provider" })
     public void asyncStreamGETTest() throws Exception {
@@ -84,7 +80,7 @@ public abstract class AsyncStreamHandlerTest extends AbstractBasicTest {
             
             FluentCaseInsensitiveStringsMap h = responseHeaders.get();
             assertNotNull(h, "No response headers");
-            assertEquals(h.getJoinedValue("content-type", ","), jetty8ContentTypeMadness(TEXT_HTML_CONTENT_TYPE_WITH_UTF_8_CHARSET), "Unexpected content-type");
+            assertEquals(h.getJoinedValue("content-type", ","), TEXT_HTML_CONTENT_TYPE_WITH_UTF_8_CHARSET, "Unexpected content-type");
             assertNull(throwable.get(), "Unexpected exception");
         }
     }
@@ -122,7 +118,7 @@ public abstract class AsyncStreamHandlerTest extends AbstractBasicTest {
             String responseBody = f.get(10, TimeUnit.SECONDS);
             FluentCaseInsensitiveStringsMap h = responseHeaders.get();
             assertNotNull(h);
-            assertEquals(h.getJoinedValue("content-type", ","), jetty8ContentTypeMadness(TEXT_HTML_CONTENT_TYPE_WITH_UTF_8_CHARSET));
+            assertEquals(h.getJoinedValue("content-type", ","), TEXT_HTML_CONTENT_TYPE_WITH_UTF_8_CHARSET);
             assertEquals(responseBody, RESPONSE);
         }
     }
@@ -163,7 +159,7 @@ public abstract class AsyncStreamHandlerTest extends AbstractBasicTest {
             assertTrue(!bodyReceived.get(), "Interrupted not working");
             FluentCaseInsensitiveStringsMap h = responseHeaders.get();
             assertNotNull(h, "Should receive non null headers");
-            assertEquals(h.getJoinedValue("content-type", ", "), jetty8ContentTypeMadness(TEXT_HTML_CONTENT_TYPE_WITH_UTF_8_CHARSET), "Unexpected content-type");
+            assertEquals(h.getJoinedValue("content-type", ", "), TEXT_HTML_CONTENT_TYPE_WITH_UTF_8_CHARSET, "Unexpected content-type");
             assertNull(throwable.get(), "Should get an exception");
         }
     }
@@ -202,7 +198,7 @@ public abstract class AsyncStreamHandlerTest extends AbstractBasicTest {
             String responseBody = f.get(5, TimeUnit.SECONDS);
             FluentCaseInsensitiveStringsMap h = responseHeaders.get();
             assertNotNull(h, "Should receive non null headers");
-            assertEquals(h.getJoinedValue("content-type", ", "), jetty8ContentTypeMadness(TEXT_HTML_CONTENT_TYPE_WITH_UTF_8_CHARSET), "Unexpected content-type");
+            assertEquals(h.getJoinedValue("content-type", ", "), TEXT_HTML_CONTENT_TYPE_WITH_UTF_8_CHARSET, "Unexpected content-type");
             assertNotNull(responseBody, "No response body");
             assertEquals(responseBody.trim(), RESPONSE, "Unexpected response body");
             assertNull(throwable.get(), "Unexpected exception");
@@ -272,7 +268,7 @@ public abstract class AsyncStreamHandlerTest extends AbstractBasicTest {
             String r = f.get(5, TimeUnit.SECONDS);
             FluentCaseInsensitiveStringsMap h = responseHeaders.get();
             assertNotNull(h, "Should receive non null headers");
-            assertEquals(h.getJoinedValue("content-type", ", "), jetty8ContentTypeMadness(TEXT_HTML_CONTENT_TYPE_WITH_UTF_8_CHARSET), "Unexpected content-type");
+            assertEquals(h.getJoinedValue("content-type", ", "), TEXT_HTML_CONTENT_TYPE_WITH_UTF_8_CHARSET, "Unexpected content-type");
             assertNotNull(r, "No response body");
             assertEquals(r.trim(), RESPONSE, "Unexpected response body");
             
@@ -303,7 +299,7 @@ public abstract class AsyncStreamHandlerTest extends AbstractBasicTest {
             f.get(5, TimeUnit.SECONDS);
             h = responseHeaders.get();
             assertNotNull(h, "Should receive non null headers");
-            assertEquals(h.getJoinedValue("content-type", ", "), jetty8ContentTypeMadness(TEXT_HTML_CONTENT_TYPE_WITH_UTF_8_CHARSET), "Unexpected content-type");
+            assertEquals(h.getJoinedValue("content-type", ", "), TEXT_HTML_CONTENT_TYPE_WITH_UTF_8_CHARSET, "Unexpected content-type");
             assertNotNull(r, "No response body");
             assertEquals(r.trim(), RESPONSE, "Unexpected response body");
         }

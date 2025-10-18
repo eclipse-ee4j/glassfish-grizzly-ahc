@@ -1,4 +1,5 @@
 /*
+ * Copyright (c) 2025 Contributors to the Eclipse Foundation.
  * Copyright (c) 2017, 2018 Oracle and/or its affiliates. All rights reserved.
  * Copyright 2010 Ning, Inc.
  *
@@ -22,17 +23,18 @@ import com.ning.http.client.AsyncHttpClient;
 import com.ning.http.client.HttpResponseBodyPart;
 import com.ning.http.client.HttpResponseHeaders;
 import com.ning.http.client.HttpResponseStatus;
+import org.eclipse.jetty.http.HttpFields;
+import org.eclipse.jetty.http.HttpHeader;
+import org.eclipse.jetty.http.HttpStatus;
+import org.eclipse.jetty.io.Content;
+import org.eclipse.jetty.server.Handler;
 import org.eclipse.jetty.server.Request;
-import org.eclipse.jetty.server.handler.AbstractHandler;
+import org.eclipse.jetty.server.Response;
+import org.eclipse.jetty.util.Callback;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.Test;
 
-import javax.servlet.AsyncContext;
-import javax.servlet.ServletException;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
-import java.io.PrintWriter;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -62,13 +64,13 @@ public abstract class AsyncStreamLifecycleTest extends AbstractBasicTest {
     }
 
     @Override
-    public AbstractHandler configureHandler() throws Exception {
-        return new AbstractHandler() {
-            public void handle(String s, Request request, HttpServletRequest req, final HttpServletResponse resp) throws IOException, ServletException {
-                resp.setContentType("text/plain;charset=utf-8");
-                resp.setStatus(200);
-                final AsyncContext continuation = req.startAsync();
-                final PrintWriter writer = resp.getWriter();
+    public Handler.Abstract configureHandler() throws Exception {
+        return new Handler.Abstract() {
+            @Override
+            public boolean handle(Request request, Response response, Callback callback) throws Exception {
+                final HttpFields.Mutable responseHeaders = response.getHeaders();
+                responseHeaders.put(HttpHeader.CONTENT_TYPE, "text/plain;charset=utf-8");
+                response.setStatus(HttpStatus.OK_200);
                 executorService.submit(new Runnable() {
                     public void run() {
                         try {
@@ -77,8 +79,12 @@ public abstract class AsyncStreamLifecycleTest extends AbstractBasicTest {
                             log.error("Failed to sleep for 100 ms.", e);
                         }
                         log.info("Delivering part1.");
-                        writer.write("part1");
-                        writer.flush();
+                        try {
+                            Content.Sink.asOutputStream(response).write("part1".getBytes());
+                            Content.Sink.asOutputStream(response).flush();
+                        } catch (IOException e) {
+                            throw new RuntimeException(e);
+                        }
                     }
                 });
                 executorService.submit(new Runnable() {
@@ -89,12 +95,16 @@ public abstract class AsyncStreamLifecycleTest extends AbstractBasicTest {
                             log.error("Failed to sleep for 200 ms.", e);
                         }
                         log.info("Delivering part2.");
-                        writer.write("part2");
-                        writer.flush();
-                        continuation.complete();
+                        try {
+                            Content.Sink.asOutputStream(response).write("part2".getBytes());
+                            Content.Sink.asOutputStream(response).flush();
+                        } catch (IOException e) {
+                            throw new RuntimeException(e);
+                        }
+                        callback.succeeded();
                     }
                 });
-                request.setHandled(true);
+                return true;
             }
         };
     }

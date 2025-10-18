@@ -1,4 +1,5 @@
 /*
+ * Copyright (c) 2025 Contributors to the Eclipse Foundation.
  * Copyright (c) 2017, 2018 Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2010-2012 Sonatype, Inc. All rights reserved.
  *
@@ -19,14 +20,16 @@ import com.ning.http.client.AsyncHttpClientConfig;
 import com.ning.http.client.BodyDeferringAsyncHandler;
 import com.ning.http.client.BodyDeferringAsyncHandler.BodyDeferringInputStream;
 import com.ning.http.client.Response;
+import org.eclipse.jetty.http.HttpFields;
+import org.eclipse.jetty.http.HttpHeader;
+import org.eclipse.jetty.http.HttpStatus;
+import org.eclipse.jetty.io.Content;
+import org.eclipse.jetty.server.Handler;
 import org.eclipse.jetty.server.Request;
-import org.eclipse.jetty.server.handler.AbstractHandler;
+import org.eclipse.jetty.util.Callback;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
-import javax.servlet.ServletException;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -44,22 +47,26 @@ public abstract class BodyDeferringAsyncHandlerTest extends AbstractBasicTest {
     // not a half gig ;) for test shorter run's sake
     protected static final int HALF_GIG = 100000;
 
-    public static class SlowAndBigHandler extends AbstractHandler {
+    public static class SlowAndBigHandler extends Handler.Abstract {
 
-        public void handle(String pathInContext, Request request, HttpServletRequest httpRequest, HttpServletResponse httpResponse) throws IOException, ServletException {
+        @Override
+        public boolean handle(Request request, org.eclipse.jetty.server.Response response, Callback callback)
+                throws Exception {
+            final HttpFields requestHeaders = request.getHeaders();
+            final HttpFields.Mutable responseHeaders = response.getHeaders();
 
             // 512MB large download
             // 512 * 1024 * 1024 = 536870912
-            httpResponse.setStatus(200);
-            httpResponse.setContentLength(HALF_GIG);
-            httpResponse.setContentType("application/octet-stream");
+            response.setStatus(HttpStatus.OK_200);
+            responseHeaders.put(HttpHeader.CONTENT_LENGTH, HALF_GIG);
+            responseHeaders.put(HttpHeader.CONTENT_TYPE, "application/octet-stream");
 
-            httpResponse.flushBuffer();
+            Content.Sink.asOutputStream(response).flush();
 
-            final boolean wantFailure = httpRequest.getHeader("X-FAIL-TRANSFER") != null;
-            final boolean wantSlow = httpRequest.getHeader("X-SLOW") != null;
+            final boolean wantFailure = requestHeaders.get("X-FAIL-TRANSFER") != null;
+            final boolean wantSlow = requestHeaders.get("X-SLOW") != null;
 
-            OutputStream os = httpResponse.getOutputStream();
+            OutputStream os = Content.Sink.asOutputStream(response);
             for (int i = 0; i < HALF_GIG; i++) {
                 os.write(i % 255);
 
@@ -76,14 +83,17 @@ public abstract class BodyDeferringAsyncHandlerTest extends AbstractBasicTest {
                         // kaboom
                         // yes, response is commited, but Jetty does aborts and
                         // drops connection
-                        httpResponse.sendError(500);
+                        org.eclipse.jetty.server.Response.writeError(request, response, callback,
+                                                                     HttpStatus.INTERNAL_SERVER_ERROR_500);
                         break;
                     }
                 }
             }
 
-            httpResponse.getOutputStream().flush();
-            httpResponse.getOutputStream().close();
+            Content.Sink.asOutputStream(response).flush();
+            Content.Sink.asOutputStream(response).close();
+            callback.succeeded();
+            return true;
         }
     }
 
@@ -114,7 +124,7 @@ public abstract class BodyDeferringAsyncHandlerTest extends AbstractBasicTest {
         in.close();
     }
 
-    public AbstractHandler configureHandler() throws Exception {
+    public Handler.Abstract configureHandler() throws Exception {
         return new SlowAndBigHandler();
     }
 
@@ -133,7 +143,7 @@ public abstract class BodyDeferringAsyncHandlerTest extends AbstractBasicTest {
             Future<Response> f = r.execute(bdah);
             Response resp = bdah.getResponse();
             assertNotNull(resp);
-            assertEquals(resp.getStatusCode(), HttpServletResponse.SC_OK);
+            assertEquals(resp.getStatusCode(), 200);
             assertEquals(true, resp.getHeader("content-length").equals(String.valueOf(HALF_GIG)));
             // we got headers only, it's probably not all yet here (we have BIG file
             // downloading)
@@ -157,7 +167,7 @@ public abstract class BodyDeferringAsyncHandlerTest extends AbstractBasicTest {
             Future<Response> f = r.execute(bdah);
             Response resp = bdah.getResponse();
             assertNotNull(resp);
-            assertEquals(resp.getStatusCode(), HttpServletResponse.SC_OK);
+            assertEquals(resp.getStatusCode(), 200);
             assertEquals(true, resp.getHeader("content-length").equals(String.valueOf(HALF_GIG)));
             // we got headers only, it's probably not all yet here (we have BIG file
             // downloading)
@@ -191,7 +201,7 @@ public abstract class BodyDeferringAsyncHandlerTest extends AbstractBasicTest {
 
             Response resp = is.getAsapResponse();
             assertNotNull(resp);
-            assertEquals(resp.getStatusCode(), HttpServletResponse.SC_OK);
+            assertEquals(resp.getStatusCode(), 200);
             assertEquals(true, resp.getHeader("content-length").equals(String.valueOf(HALF_GIG)));
             // "consume" the body, but our code needs input stream
             CountingOutputStream cos = new CountingOutputStream();
@@ -219,7 +229,7 @@ public abstract class BodyDeferringAsyncHandlerTest extends AbstractBasicTest {
 
             Response resp = is.getAsapResponse();
             assertNotNull(resp);
-            assertEquals(resp.getStatusCode(), HttpServletResponse.SC_OK);
+            assertEquals(resp.getStatusCode(), 200);
             assertEquals(true, resp.getHeader("content-length").equals(String.valueOf(HALF_GIG)));
             // "consume" the body, but our code needs input stream
             CountingOutputStream cos = new CountingOutputStream();

@@ -1,4 +1,5 @@
 /*
+ * Copyright (c) 2025 Contributors to the Eclipse Foundation.
  * Copyright (c) 2017, 2018 Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2012 Sonatype, Inc. All rights reserved.
  *
@@ -23,14 +24,15 @@ import com.ning.http.client.Response;
 import com.ning.http.client.filter.FilterContext;
 import com.ning.http.client.filter.FilterException;
 import com.ning.http.client.filter.ResponseFilter;
-import org.eclipse.jetty.server.handler.AbstractHandler;
+import org.eclipse.jetty.http.HttpFields;
+import org.eclipse.jetty.http.HttpHeader;
+import org.eclipse.jetty.http.HttpStatus;
+import org.eclipse.jetty.io.Content;
+import org.eclipse.jetty.server.Handler;
+import org.eclipse.jetty.util.Callback;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
-import javax.servlet.ServletException;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
-import java.io.IOException;
 import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -39,7 +41,7 @@ public abstract class PostRedirectGetTest extends AbstractBasicTest {
     // ------------------------------------------------------ Test Configuration
 
     @Override
-    public AbstractHandler configureHandler() throws Exception {
+    public Handler.Abstract configureHandler() throws Exception {
         return new PostRedirectGetHandler();
     }
 
@@ -147,38 +149,50 @@ public abstract class PostRedirectGetTest extends AbstractBasicTest {
 
     // ---------------------------------------------------------- Nested Classes
 
-    public static class PostRedirectGetHandler extends AbstractHandler {
+    public static class PostRedirectGetHandler extends Handler.Abstract {
 
         final AtomicInteger counter = new AtomicInteger();
 
         @Override
-        public void handle(String pathInContext, org.eclipse.jetty.server.Request request, HttpServletRequest httpRequest, HttpServletResponse httpResponse) throws IOException, ServletException {
+        public boolean handle(org.eclipse.jetty.server.Request request, org.eclipse.jetty.server.Response response,
+                              Callback callback) throws Exception {
+            final HttpFields requestHeaders = request.getHeaders();
+            final HttpFields.Mutable responseHeaders = response.getHeaders();
 
-            final boolean expectGet = (httpRequest.getHeader("x-expect-get") != null);
-            final boolean expectPost = (httpRequest.getHeader("x-expect-post") != null);
+            final boolean expectGet = (requestHeaders.get("x-expect-get") != null);
+            final boolean expectPost = (requestHeaders.get("x-expect-post") != null);
             if (expectGet) {
                 final String method = request.getMethod();
                 if (!"GET".equals(method)) {
-                    httpResponse.sendError(500, "Incorrect method.  Expected GET, received " + method);
-                    return;
+                    org.eclipse.jetty.server.Response.writeError(request, response, callback,
+                                                                 HttpStatus.INTERNAL_SERVER_ERROR_500,
+                                                                 "Incorrect method.  Expected GET, received " + method);
+                    callback.succeeded();
+                    return true;
                 }
-                httpResponse.setStatus(200);
-                httpResponse.getOutputStream().write("OK".getBytes());
-                httpResponse.getOutputStream().flush();
-                return;
+                response.setStatus(HttpStatus.OK_200);
+                Content.Sink.asOutputStream(response).write("OK".getBytes());
+                Content.Sink.asOutputStream(response).flush();
+                callback.succeeded();
+                return true;
             } else if (expectPost) {
                 final String method = request.getMethod();
                 if (!"POST".equals(method)) {
-                    httpResponse.sendError(500, "Incorrect method.  Expected POST, received " + method);
-                    return;
+                    org.eclipse.jetty.server.Response.writeError(request, response, callback,
+                                                                 HttpStatus.INTERNAL_SERVER_ERROR_500,
+                                                                 "Incorrect method.  Expected POST, received " +
+                                                                 method);
+                    callback.succeeded();
+                    return true;
                 }
-                httpResponse.setStatus(200);
-                httpResponse.getOutputStream().write("OK".getBytes());
-                httpResponse.getOutputStream().flush();
-                return;
+                response.setStatus(HttpStatus.OK_200);
+                Content.Sink.asOutputStream(response).write("OK".getBytes());
+                Content.Sink.asOutputStream(response).flush();
+                callback.succeeded();
+                return true;
             }
 
-            String header = httpRequest.getHeader("x-redirect");
+            String header = requestHeaders.get("x-redirect");
             if (header != null) {
                 // format for header is <status code>|<location url>
                 String[] parts = header.split("@");
@@ -187,24 +201,30 @@ public abstract class PostRedirectGetTest extends AbstractBasicTest {
                     redirectCode = Integer.parseInt(parts[0]);
                 } catch (Exception ex) {
                     ex.printStackTrace();
-                    httpResponse.sendError(500, "Unable to parse redirect code");
-                    return;
+                    org.eclipse.jetty.server.Response.writeError(request, response, callback,
+                                                                 HttpStatus.INTERNAL_SERVER_ERROR_500, "Unable to parse redirect code");
+                    callback.succeeded();
+                    return true;
                 }
-                httpResponse.setStatus(redirectCode);
-                if (httpRequest.getHeader("x-negative") == null) {
-                    httpResponse.addHeader("x-expect-get", "true");
+                response.setStatus(redirectCode);
+                if (requestHeaders.get("x-negative") == null) {
+                    responseHeaders.put("x-expect-get", "true");
                 } else {
-                    httpResponse.addHeader("x-expect-post", "true");
+                    responseHeaders.put("x-expect-post", "true");
                 }
-                httpResponse.setContentLength(0);
-                httpResponse.addHeader("Location", parts[1] + counter.getAndIncrement());
-                httpResponse.getOutputStream().flush();
-                return;
+                responseHeaders.put(HttpHeader.CONTENT_LENGTH, 0L);
+                responseHeaders.put(HttpHeader.LOCATION, parts[1] + counter.getAndIncrement());
+                Content.Sink.asOutputStream(response).flush();
+                callback.succeeded();
+                return true;
             }
 
-            httpResponse.sendError(500);
-            httpResponse.getOutputStream().flush();
-            httpResponse.getOutputStream().close();
+            org.eclipse.jetty.server.Response.writeError(request, response, callback,
+                                                         HttpStatus.INTERNAL_SERVER_ERROR_500);
+            Content.Sink.asOutputStream(response).flush();
+            Content.Sink.asOutputStream(response).close();
+            callback.succeeded();
+            return true;
         }
     }
 }

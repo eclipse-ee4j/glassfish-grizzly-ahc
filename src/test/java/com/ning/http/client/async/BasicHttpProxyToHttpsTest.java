@@ -1,4 +1,5 @@
 /*
+ * Copyright (c) 2025 Contributors to the Eclipse Foundation.
  * Copyright (c) 2017, 2018 Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2016 AsyncHttpClient Project. All rights reserved.
  *
@@ -35,12 +36,11 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import javax.servlet.ServletException;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
-
+import org.eclipse.jetty.http.HttpFields;
+import org.eclipse.jetty.http.HttpHeader;
+import org.eclipse.jetty.http.HttpStatus;
 import org.eclipse.jetty.http.HttpVersion;
-import org.eclipse.jetty.proxy.ConnectHandler;
+import org.eclipse.jetty.io.Content;
 import org.eclipse.jetty.server.Handler;
 import org.eclipse.jetty.server.HttpConfiguration;
 import org.eclipse.jetty.server.HttpConnectionFactory;
@@ -48,8 +48,7 @@ import org.eclipse.jetty.server.SecureRequestCustomizer;
 import org.eclipse.jetty.server.Server;
 import org.eclipse.jetty.server.ServerConnector;
 import org.eclipse.jetty.server.SslConnectionFactory;
-import org.eclipse.jetty.server.handler.AbstractHandler;
-import org.eclipse.jetty.server.handler.HandlerWrapper;
+import org.eclipse.jetty.util.Callback;
 import org.eclipse.jetty.util.ssl.SslContextFactory;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
@@ -113,7 +112,7 @@ public abstract class BasicHttpProxyToHttpsTest extends AbstractBasicTest {
         src.setStsIncludeSubDomains(true);
         https_config.addCustomizer(src);
 
-        SslContextFactory sslContextFactory = new SslContextFactory.Server();
+        SslContextFactory.Server sslContextFactory = new SslContextFactory.Server();
         ClassLoader cl = getClass().getClassLoader();
         URL cacertsUrl = cl.getResource("ssltest-cacerts.jks");
         String trustStoreFile = new File(cacertsUrl.toURI()).getAbsolutePath();
@@ -143,7 +142,7 @@ public abstract class BasicHttpProxyToHttpsTest extends AbstractBasicTest {
     }
 
     @Override
-    public AbstractHandler configureHandler() throws Exception {
+    public Handler.Abstract configureHandler() throws Exception {
         return new ProxyConnectHTTPHandler(new EchoHandler());
     }
 
@@ -172,7 +171,7 @@ public abstract class BasicHttpProxyToHttpsTest extends AbstractBasicTest {
                 .build();
             Future<Response> responseFuture = client.executeRequest(request);
             Response response = responseFuture.get();
-            Assert.assertEquals(response.getStatusCode(), HttpServletResponse.SC_OK);
+            Assert.assertEquals(response.getStatusCode(), 200);
             Assert.assertEquals("127.0.0.1:" + port2, response.getHeader("x-host"));
         }
     }
@@ -183,67 +182,65 @@ public abstract class BasicHttpProxyToHttpsTest extends AbstractBasicTest {
         return proxyServer;
     }
 
-    private static class ProxyConnectHTTPHandler extends ConnectHandler {
+    private static class ProxyConnectHTTPHandler extends org.eclipse.jetty.server.handler.ConnectHandler {
 
         public ProxyConnectHTTPHandler(Handler handler) {
             super(handler);
         }
 
         @Override
-        protected boolean handleAuthentication(HttpServletRequest request, HttpServletResponse response, String address)
-        {
+        protected boolean handleAuthentication(org.eclipse.jetty.server.Request request,
+                                               org.eclipse.jetty.server.Response response, String address) {
             return true;
         }
 
-        /**
-         * Override this method do to the {@link ConnectHandler#handleConnect(org.eclipse.jetty.server.Request, HttpServletRequest, HttpServletResponse, String)} doesn't allow me to generate a response with
-         * {@link HttpServletResponse#SC_PROXY_AUTHENTICATION_REQUIRED} neither {@link HttpServletResponse#SC_UNAUTHORIZED}.
-         */
         @Override
-        protected void handleConnect(org.eclipse.jetty.server.Request baseRequest, HttpServletRequest request, HttpServletResponse response, String serverAddress)
-        {
+        protected void handleConnect(final org.eclipse.jetty.server.Request request,
+                                     final org.eclipse.jetty.server.Response response, final Callback callback,
+                                     String serverAddress) {
             try {
-                if (!this.doHandleAuthentication(baseRequest, response)) {
+                if (!this.doHandleAuthentication(request, response)) {
+                    callback.succeeded();
                     return;
                 }
             } catch (IOException e) {
                 e.printStackTrace();
                 throw new RuntimeException(e);
-            } catch (ServletException e) {
-                e.printStackTrace();
-                throw new RuntimeException(e);
             }
             // Just call super class method to establish the tunnel and avoid copy/paste.
-            super.handleConnect(baseRequest, request, response, serverAddress);
+            super.handleConnect(request, response, callback, serverAddress);
         }
 
-        public boolean doHandleAuthentication(org.eclipse.jetty.server.Request request, HttpServletResponse httpResponse) throws IOException, ServletException {
+        public boolean doHandleAuthentication(org.eclipse.jetty.server.Request request,
+                                              org.eclipse.jetty.server.Response response) throws IOException {
+            final HttpFields requestHeaders = request.getHeaders();
+            final HttpFields.Mutable responseHeaders = response.getHeaders();
+
             boolean result = false;
             if ("CONNECT".equals(request.getMethod())) {
-                String authorization = request.getHeader("Proxy-Authorization");
+                final String authorization = requestHeaders.get(HttpHeader.PROXY_AUTHORIZATION);
                 if (authorization == null) {
-                    httpResponse.setStatus(HttpServletResponse.SC_PROXY_AUTHENTICATION_REQUIRED);
-                    httpResponse.setHeader("Proxy-Authenticate", "Basic realm=\"Fake Realm\"");
+                    response.setStatus(HttpStatus.PROXY_AUTHENTICATION_REQUIRED_407);
+                    responseHeaders.put(HttpHeader.PROXY_AUTHENTICATE, "Basic realm=\"Fake Realm\"");
                     result = false;
-                    httpResponse.getOutputStream().flush();
-                    httpResponse.getOutputStream().close();
+                    Content.Sink.asOutputStream(response).flush();
+                    Content.Sink.asOutputStream(response).close();
                 } else if (authorization
                     .equals("Basic am9obmRvZTpwYXNz")) {
-                    httpResponse.setStatus(HttpServletResponse.SC_OK);
+                    response.setStatus(HttpStatus.OK_200);
                     result = true;
                 } else {
-                    httpResponse.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
-                    httpResponse.getOutputStream().flush();
-                    httpResponse.getOutputStream().close();
+                    response.setStatus(HttpStatus.UNAUTHORIZED_401);
+                    Content.Sink.asOutputStream(response).flush();
+                    Content.Sink.asOutputStream(response).close();
                     result = false;
                 }
-                request.setHandled(true);
             }
             return result;
         }
     }
 
-    private static class AuthenticateHandler extends HandlerWrapper {
+    private static class AuthenticateHandler extends Handler.Abstract {
 
         private Handler target;
 
@@ -252,23 +249,24 @@ public abstract class BasicHttpProxyToHttpsTest extends AbstractBasicTest {
         }
 
         @Override
-        public void handle(String pathInContext, org.eclipse.jetty.server.Request request, HttpServletRequest httpRequest,
-                           HttpServletResponse httpResponse) throws IOException, ServletException {
-            String authorization = httpRequest.getHeader("Authorization");
-            if (authorization != null && authorization.equals("Basic dXNlcjpwYXNzd2Q="))
-            {
-                httpResponse.addHeader("target", request.getHttpURI().getPath());
-                target.handle(pathInContext, request, httpRequest, httpResponse);
-            }
-            else
-            {
-                httpResponse.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
-                httpResponse.setHeader("www-authenticate", "Basic realm=\"Fake Realm\"");
-                httpResponse.getOutputStream().flush();
-                httpResponse.getOutputStream().close();
-                request.setHandled(true);
-            }
+        public boolean handle(org.eclipse.jetty.server.Request request, org.eclipse.jetty.server.Response response,
+                              Callback callback) throws Exception {
+            final HttpFields requestHeaders = request.getHeaders();
+            final HttpFields.Mutable responseHeaders = response.getHeaders();
 
+            final String authorization = requestHeaders.get(HttpHeader.AUTHORIZATION);
+            if (authorization != null && authorization.equals("Basic dXNlcjpwYXNzd2Q=")) {
+                responseHeaders.put("target", request.getHttpURI().getPath());
+                target.handle(request, response, callback);
+            } else {
+                response.setStatus(HttpStatus.UNAUTHORIZED_401);
+                responseHeaders.put(HttpHeader.WWW_AUTHENTICATE, "Basic realm=\"Fake Realm\"");
+
+                Content.Sink.asOutputStream(response).flush();
+                Content.Sink.asOutputStream(response).close();
+                callback.succeeded();
+            }
+            return true;
         }
     }
 

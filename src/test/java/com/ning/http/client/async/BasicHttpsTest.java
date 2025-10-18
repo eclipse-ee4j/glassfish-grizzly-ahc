@@ -1,4 +1,5 @@
 /*
+ * Copyright (c) 2025 Contributors to the Eclipse Foundation.
  * Copyright (c) 2017, 2018 Oracle and/or its affiliates. All rights reserved.
  * Copyright 2010 Ning, Inc.
  *
@@ -21,7 +22,14 @@ import com.ning.http.client.AsyncHttpClient;
 import com.ning.http.client.AsyncHttpClientConfig.Builder;
 import com.ning.http.client.Response;
 
+import org.eclipse.jetty.http.HttpCookie;
+import org.eclipse.jetty.http.HttpField;
+import org.eclipse.jetty.http.HttpFields;
+import org.eclipse.jetty.http.HttpHeader;
+import org.eclipse.jetty.http.HttpStatus;
 import org.eclipse.jetty.http.HttpVersion;
+import org.eclipse.jetty.io.Content;
+import org.eclipse.jetty.server.Handler;
 import org.eclipse.jetty.server.HttpConfiguration;
 import org.eclipse.jetty.server.HttpConnectionFactory;
 import org.eclipse.jetty.server.Request;
@@ -29,8 +37,8 @@ import org.eclipse.jetty.server.SecureRequestCustomizer;
 import org.eclipse.jetty.server.Server;
 import org.eclipse.jetty.server.ServerConnector;
 import org.eclipse.jetty.server.SslConnectionFactory;
-import org.eclipse.jetty.server.handler.AbstractHandler;
-import org.eclipse.jetty.server.handler.HandlerWrapper;
+import org.eclipse.jetty.util.Callback;
+import org.eclipse.jetty.util.Fields;
 import org.eclipse.jetty.util.ssl.SslContextFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -45,9 +53,6 @@ import javax.net.ssl.SSLContext;
 import javax.net.ssl.TrustManager;
 import javax.net.ssl.TrustManagerFactory;
 import javax.net.ssl.X509TrustManager;
-import javax.servlet.ServletException;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
 
 import java.io.File;
 import java.io.IOException;
@@ -59,7 +64,7 @@ import java.security.KeyStore;
 import java.security.SecureRandom;
 import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
-import java.util.Enumeration;
+import java.util.List;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
@@ -71,77 +76,80 @@ public abstract class BasicHttpsTest extends AbstractBasicTest {
 
     protected final Logger log = LoggerFactory.getLogger(BasicHttpsTest.class);
 
-    public static class EchoHandler extends HandlerWrapper {
+    public static class EchoHandler extends Handler.Abstract {
 
-        public void handle(String pathInContext, Request r, HttpServletRequest httpRequest, HttpServletResponse httpResponse) throws ServletException, IOException {
+        @Override
+        public boolean handle(Request request, org.eclipse.jetty.server.Response response, Callback callback)
+                throws Exception {
 
-            httpResponse.setContentType("text/html; charset=utf-8");
-            Enumeration<?> e = httpRequest.getHeaderNames();
+            final HttpFields requestHeaders = request.getHeaders();
+            final HttpFields.Mutable responseHeaders = response.getHeaders();
+
+            responseHeaders.put(HttpHeader.CONTENT_TYPE, "text/html; charset=utf-8");
             String param;
-            while (e.hasMoreElements()) {
-                param = e.nextElement().toString();
-
+            for (final HttpField field : requestHeaders) {
+                param = field.getName();
                 if (param.startsWith("LockThread")) {
                     try {
                         Thread.sleep(40 * 1000);
                     } catch (InterruptedException ex) { // nothing to do here
                     }
                 }
-
-                httpResponse.addHeader("X-" + param, httpRequest.getHeader(param));
+                responseHeaders.put("X-" + param, field.getValue());
             }
 
-            Enumeration<?> i = httpRequest.getParameterNames();
-
-            StringBuilder requestBody = new StringBuilder();
-            while (i.hasMoreElements()) {
-                param = i.nextElement().toString();
-                httpResponse.addHeader("X-" + param, httpRequest.getParameter(param));
+            final Fields allParameters = Request.getParameters(request);
+            final StringBuilder requestBody = new StringBuilder();
+            for (final Fields.Field field : allParameters) {
+                param = field.getName();
+                responseHeaders.put("X-" + param, field.getValue());
                 requestBody.append(param);
                 requestBody.append("_");
             }
 
-            String pathInfo = httpRequest.getPathInfo();
+            final String pathInfo = Request.getPathInContext(request);
             if (pathInfo != null)
-                httpResponse.addHeader("X-pathInfo", pathInfo);
+                responseHeaders.put("X-pathInfo", pathInfo);
 
-            String queryString = httpRequest.getQueryString();
+            String queryString = request.getHttpURI().getQuery();
             if (queryString != null)
-                httpResponse.addHeader("X-queryString", queryString);
+                responseHeaders.put("X-queryString", queryString);
 
-            httpResponse.addHeader("X-KEEP-ALIVE", httpRequest.getRemoteAddr() + ":" + httpRequest.getRemotePort());
+            responseHeaders.put("X-KEEP-ALIVE", Request.getRemoteAddr(request) + ":" + Request.getRemotePort(request));
 
-            javax.servlet.http.Cookie[] cs = httpRequest.getCookies();
-            if (cs != null) {
-                for (javax.servlet.http.Cookie c : cs) {
-                    httpResponse.addCookie(c);
-                }
+            final List<HttpCookie> cookies = Request.getCookies(request);
+            for (final HttpCookie cookie : cookies) {
+                responseHeaders.put(HttpHeader.SET_COOKIE, cookie.toString());
             }
 
             if (requestBody.length() > 0) {
-                httpResponse.getOutputStream().write(requestBody.toString().getBytes());
+                Content.Sink.asOutputStream(response).write(requestBody.toString().getBytes());
             }
 
             int size = 10 * 1024;
-            if (httpRequest.getContentLength() > 0) {
-                size = httpRequest.getContentLength();
+            if (request.getLength() > 0) {
+                size = (int) request.getLength();
             }
             byte[] bytes = new byte[size];
             int pos = 0;
             if (bytes.length > 0) {
                 // noinspection ResultOfMethodCallIgnored
                 int read = 0;
-                while (read != -1) {
-                    read = httpRequest.getInputStream().read(bytes, pos, bytes.length - pos);
-                    pos += read;
+                try (final InputStream in = Content.Source.asInputStream(request)) {
+                    while (read != -1) {
+                        read = in.read(bytes, pos, bytes.length - pos);
+                        pos += read;
+                    }
                 }
 
-                httpResponse.getOutputStream().write(bytes, 0, pos + 1); // (pos + 1) because last read added -1
+                Content.Sink.asOutputStream(response).write(bytes, 0, pos + 1); // (pos + 1) because last read added -1
             }
 
-            httpResponse.setStatus(200);
-            httpResponse.getOutputStream().flush();
-            httpResponse.getOutputStream().close();
+            response.setStatus(HttpStatus.OK_200);
+            Content.Sink.asOutputStream(response).flush();
+            Content.Sink.asOutputStream(response).close();
+            callback.succeeded();
+            return true;
 
         }
     }
@@ -161,7 +169,7 @@ public abstract class BasicHttpsTest extends AbstractBasicTest {
         return String.format("https://127.0.0.1:%d/foo/test", port1);
     }
 
-    public AbstractHandler configureHandler() throws Exception {
+    public Handler.Abstract configureHandler() throws Exception {
         return new EchoHandler();
     }
 
@@ -185,7 +193,7 @@ public abstract class BasicHttpsTest extends AbstractBasicTest {
         src.setStsIncludeSubDomains(true);
         https_config.addCustomizer(src);
 
-        SslContextFactory sslContextFactory = new SslContextFactory.Server();
+        final SslContextFactory.Server sslContextFactory = new SslContextFactory.Server();
 
         ClassLoader cl = getClass().getClassLoader();
         // override system properties
@@ -229,7 +237,7 @@ public abstract class BasicHttpsTest extends AbstractBasicTest {
             Future<Response> f = client.preparePost(getTargetUrl()).setBody(file).setHeader("Content-Type", "text/html").execute();
             Response resp = f.get();
             assertNotNull(resp);
-            assertEquals(resp.getStatusCode(), HttpServletResponse.SC_OK);
+            assertEquals(resp.getStatusCode(), 200);
             assertEquals(resp.getResponseBody(), "This is a simple test file");
         }
     }
@@ -255,12 +263,13 @@ public abstract class BasicHttpsTest extends AbstractBasicTest {
     public void multipleSSLWithoutCacheTest() throws Throwable {
         try (AsyncHttpClient client = getAsyncHttpClient(new Builder().setSSLContext(createSSLContext(new AtomicBoolean(true))).setAllowPoolingSslConnections(false).build())) {
             String body = "hello there";
-            client.preparePost(getTargetUrl()).setBody(body).setHeader("Content-Type", "text/html").execute();
-
-            client.preparePost(getTargetUrl()).setBody(body).setHeader("Content-Type", "text/html").execute();
-
-            Response response = client.preparePost(getTargetUrl()).setBody(body).setHeader("Content-Type", "text/html").execute().get();
-
+            // once
+            Response response = client.preparePost(getTargetUrl()).setBody(body).setHeader("Content-Type", "text/html")
+                                      .setHeader("Connection", "keep-alive").execute().get();
+            assertEquals(response.getResponseBody(), body);
+            // twice
+            response = client.preparePost(getTargetUrl()).setBody(body).setHeader("Content-Type", "text/html")
+                             .setHeader("Connection", "keep-alive").execute().get();
             assertEquals(response.getResponseBody(), body);
         }
     }

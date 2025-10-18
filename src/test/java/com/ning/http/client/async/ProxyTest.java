@@ -1,4 +1,5 @@
 /*
+ * Copyright (c) 2025 Contributors to the Eclipse Foundation.
  * Copyright (c) 2017, 2018 Oracle and/or its affiliates. All rights reserved.
  * Copyright 2010 Ning, Inc.
  *
@@ -34,13 +35,11 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
-import javax.servlet.ServletException;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
-
+import org.eclipse.jetty.http.HttpFields;
+import org.eclipse.jetty.http.HttpStatus;
+import org.eclipse.jetty.server.Handler;
 import org.eclipse.jetty.server.Request;
-import org.eclipse.jetty.server.handler.AbstractHandler;
-import org.eclipse.jetty.server.handler.HandlerWrapper;
+import org.eclipse.jetty.util.Callback;
 import org.testng.annotations.Test;
 
 /**
@@ -49,20 +48,24 @@ import org.testng.annotations.Test;
  * @author Hubert Iwaniuk
  */
 public abstract class ProxyTest extends AbstractBasicTest {
-    private class ProxyHandler extends HandlerWrapper {
-        public void handle(String s, Request r, HttpServletRequest request, HttpServletResponse response) throws IOException, ServletException {
+    private class ProxyHandler extends Handler.Abstract {
+        @Override
+        public boolean handle(Request request, org.eclipse.jetty.server.Response response, Callback callback)
+                throws Exception {
             if ("GET".equalsIgnoreCase(request.getMethod())) {
-                response.addHeader("target", r.getHttpURI().getPath());
-                response.setStatus(HttpServletResponse.SC_OK);
+                final HttpFields.Mutable responseHeaders = response.getHeaders();
+                responseHeaders.put("target", request.getHttpURI().getPath());
+                response.setStatus(HttpStatus.OK_200);
             } else { // this handler is to handle POST request
-                response.sendError(HttpServletResponse.SC_FORBIDDEN);
+                org.eclipse.jetty.server.Response.writeError(request, response, callback, HttpStatus.FORBIDDEN_403);
             }
-            r.setHandled(true);
+            callback.succeeded();
+            return true;
         }
     }
 
     @Override
-    public AbstractHandler configureHandler() throws Exception {
+    public Handler.Abstract configureHandler() throws Exception {
         return new ProxyHandler();
     }
 
@@ -73,7 +76,7 @@ public abstract class ProxyTest extends AbstractBasicTest {
             Future<Response> f = client.prepareGet(target).setProxyServer(new ProxyServer("127.0.0.1", port1)).execute();
             Response resp = f.get(3, TimeUnit.SECONDS);
             assertNotNull(resp);
-            assertEquals(resp.getStatusCode(), HttpServletResponse.SC_OK);
+            assertEquals(resp.getStatusCode(), 200);
             assertEquals(resp.getHeader("target"), "/");
         }
     }
@@ -86,7 +89,7 @@ public abstract class ProxyTest extends AbstractBasicTest {
             Future<Response> f = client.prepareGet(target).execute();
             Response resp = f.get(3, TimeUnit.SECONDS);
             assertNotNull(resp);
-            assertEquals(resp.getStatusCode(), HttpServletResponse.SC_OK);
+            assertEquals(resp.getStatusCode(), 200);
             assertEquals(resp.getHeader("target"), "/");
         }
     }
@@ -99,7 +102,7 @@ public abstract class ProxyTest extends AbstractBasicTest {
             Future<Response> f = client.prepareGet(target).setProxyServer(new ProxyServer("127.0.0.1", port1)).execute();
             Response resp = f.get(3, TimeUnit.SECONDS);
             assertNotNull(resp);
-            assertEquals(resp.getStatusCode(), HttpServletResponse.SC_OK);
+            assertEquals(resp.getStatusCode(), 200);
             assertEquals(resp.getHeader("target"), "/");
         }
     }
@@ -125,7 +128,7 @@ public abstract class ProxyTest extends AbstractBasicTest {
             Future<Response> f = client.prepareGet(target).setProxyServer(new ProxyServer("127.0.0.1", port1 - 1).addNonProxyHost("127.0.0.1")).execute();
             Response resp = f.get(3, TimeUnit.SECONDS);
             assertNotNull(resp);
-            assertEquals(resp.getStatusCode(), HttpServletResponse.SC_OK);
+            assertEquals(resp.getStatusCode(), 200);
             assertEquals(resp.getHeader("target"), "/");
         }
     }
@@ -149,7 +152,7 @@ public abstract class ProxyTest extends AbstractBasicTest {
                 Future<Response> f = client.prepareGet(target).execute();
                 Response resp = f.get(3, TimeUnit.SECONDS);
                 assertNotNull(resp);
-                assertEquals(resp.getStatusCode(), HttpServletResponse.SC_OK);
+                assertEquals(resp.getStatusCode(), 200);
                 assertEquals(resp.getHeader("target"), "/");
 
                 target = "http://localhost:1234/";
@@ -213,7 +216,7 @@ public abstract class ProxyTest extends AbstractBasicTest {
                 Future<Response> f = client.prepareGet(target).execute();
                 Response resp = f.get(3, TimeUnit.SECONDS);
                 assertNotNull(resp);
-                assertEquals(resp.getStatusCode(), HttpServletResponse.SC_OK);
+                assertEquals(resp.getStatusCode(), 200);
                 assertEquals(resp.getHeader("target"), "/");
 
                 target = "http://localhost:1234/";
@@ -282,7 +285,7 @@ public abstract class ProxyTest extends AbstractBasicTest {
                 Future<Response> f = client.prepareGet(target).execute();
                 Response resp = f.get(3, TimeUnit.SECONDS);
                 assertNotNull(resp);
-                assertEquals(resp.getStatusCode(), HttpServletResponse.SC_OK);
+                assertEquals(resp.getStatusCode(), 200);
                 assertEquals(resp.getHeader("target"), "/");
 
                 target = "http://localhost:1234/";

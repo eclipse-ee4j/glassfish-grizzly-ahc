@@ -1,4 +1,5 @@
 /*
+ * Copyright (c) 2025 Contributors to the Eclipse Foundation.
  * Copyright (c) 2017, 2018 Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2016 AsyncHttpClient Project. All rights reserved.
  *
@@ -30,13 +31,14 @@ import java.net.UnknownHostException;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 
-import javax.servlet.ServletException;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
-
+import org.eclipse.jetty.http.HttpFields;
+import org.eclipse.jetty.http.HttpHeader;
+import org.eclipse.jetty.http.HttpStatus;
+import org.eclipse.jetty.io.Content;
+import org.eclipse.jetty.server.Handler;
 import org.eclipse.jetty.server.Server;
 import org.eclipse.jetty.server.ServerConnector;
-import org.eclipse.jetty.server.handler.AbstractHandler;
+import org.eclipse.jetty.util.Callback;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -50,28 +52,31 @@ public abstract class BasicHttpProxyToHttpTest extends AbstractBasicTest {
 
     private Server server2;
 
-    public static class ProxyHTTPHandler extends AbstractHandler {
+    public static class ProxyHTTPHandler extends Handler.Abstract {
 
         @Override
-        public void handle(String pathInContext, org.eclipse.jetty.server.Request request, HttpServletRequest httpRequest,
-                           HttpServletResponse httpResponse) throws IOException, ServletException {
+        public boolean handle(org.eclipse.jetty.server.Request request, org.eclipse.jetty.server.Response response,
+                              Callback callback) throws Exception {
+            final HttpFields requestHeaders = request.getHeaders();
+            final HttpFields.Mutable responseHeaders = response.getHeaders();
 
-            String authorization = httpRequest.getHeader("Authorization");
-            String proxyAuthorization = httpRequest.getHeader("Proxy-Authorization");
+            final String authorization = requestHeaders.get(HttpHeader.AUTHORIZATION);
+            final String proxyAuthorization = requestHeaders.get(HttpHeader.PROXY_AUTHORIZATION);
             if (proxyAuthorization == null) {
-                httpResponse.setStatus(HttpServletResponse.SC_PROXY_AUTHENTICATION_REQUIRED);
-                httpResponse.setHeader("Proxy-Authenticate", "Basic realm=\"Fake Realm\"");
+                response.setStatus(HttpStatus.PROXY_AUTHENTICATION_REQUIRED_407);
+                responseHeaders.put(HttpHeader.PROXY_AUTHENTICATE, "Basic realm=\"Fake Realm\"");
             } else if (proxyAuthorization
                 .equals("Basic am9obmRvZTpwYXNz") && authorization != null && authorization.equals("Basic dXNlcjpwYXNzd2Q=")) {
-                httpResponse.addHeader("target", request.getHttpURI().getPath());
-                httpResponse.setStatus(HttpServletResponse.SC_OK);
+                responseHeaders.put("target", request.getHttpURI().getPath());
+                response.setStatus(HttpStatus.OK_200);
             } else {
-                httpResponse.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
-                httpResponse.setHeader("www-authenticate", "Basic realm=\"Fake Realm\"");
+                response.setStatus(HttpStatus.UNAUTHORIZED_401);
+                responseHeaders.put(HttpHeader.WWW_AUTHENTICATE, "Basic realm=\"Fake Realm\"");
             }
-            httpResponse.getOutputStream().flush();
-            httpResponse.getOutputStream().close();
-            request.setHandled(true);
+            Content.Sink.asOutputStream(response).flush();
+            Content.Sink.asOutputStream(response).close();
+            callback.succeeded();
+            return true;
         }
     }
 
@@ -113,7 +118,7 @@ public abstract class BasicHttpProxyToHttpTest extends AbstractBasicTest {
 
 
     @Override
-    public AbstractHandler configureHandler() throws Exception {
+    public Handler.Abstract configureHandler() throws Exception {
         return new ProxyHTTPHandler();
     }
 
@@ -134,7 +139,7 @@ public abstract class BasicHttpProxyToHttpTest extends AbstractBasicTest {
                 new Realm.RealmBuilder().setPrincipal("user").setPassword("passwd").setScheme(BASIC).setUsePreemptiveAuth(usePreemptiveAuth).build()).build();
             Future<Response> responseFuture = client.executeRequest(request);
             Response response = responseFuture.get();
-            Assert.assertEquals(response.getStatusCode(), HttpServletResponse.SC_OK);
+            Assert.assertEquals(response.getStatusCode(), 200);
             Assert.assertTrue(getTargetUrl().endsWith(response.getHeader("target")));
         }
     }

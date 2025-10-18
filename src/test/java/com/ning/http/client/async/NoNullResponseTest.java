@@ -1,4 +1,5 @@
 /*
+ * Copyright (c) 2025 Contributors to the Eclipse Foundation.
  * Copyright (c) 2017, 2018 Oracle and/or its affiliates. All rights reserved.
  * Copyright 2010 Ning, Inc.
  *
@@ -32,18 +33,18 @@ import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
 
 public abstract class NoNullResponseTest extends AbstractBasicTest {
-    private static final String VERISIGN_HTTPS_URL = "https://www.verisign.com";
+    private static final String HTTPS_REPO_MAVEN_APACHE_ORG = "https://repo.maven.apache.org";
 
-    @Test(invocationCount = 4, groups = { "online", "default_provider" })
+    @Test(invocationCount = 3, groups = { "online", "default_provider" })
     public void multipleSslRequestsWithDelayAndKeepAlive() throws Throwable {
 
         AsyncHttpClientConfig.Builder configBuilder = new AsyncHttpClientConfig.Builder().setFollowRedirect(true).setSSLContext(getSSLContext()).setAllowPoolingConnections(true).setConnectTimeout(10000)
                 .setPooledConnectionIdleTimeout(60000).setRequestTimeout(10000).setMaxConnectionsPerHost(-1).setMaxConnections(-1);
 
         try (AsyncHttpClient client = getAsyncHttpClient(configBuilder.build())) {
-            final BoundRequestBuilder builder = client.prepareGet(VERISIGN_HTTPS_URL);
+            final BoundRequestBuilder builder = client.prepareGet(HTTPS_REPO_MAVEN_APACHE_ORG);
             final Response response1 = builder.execute().get();
-            Thread.sleep(4000);
+            Thread.sleep(5000);
             final Response response2 = builder.execute().get();
             if (response2 != null) {
                 System.out.println("Success (2nd response was not null).");

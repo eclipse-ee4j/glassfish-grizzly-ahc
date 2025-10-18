@@ -1,4 +1,5 @@
 /*
+ * Copyright (c) 2025 Contributors to the Eclipse Foundation.
  * Copyright (c) 2017, 2018 Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2012 Sonatype, Inc. All rights reserved.
  *
@@ -17,14 +18,9 @@ package com.ning.http.client.async;
 import static org.testng.Assert.assertTrue;
 import static org.testng.Assert.fail;
 
-import java.io.IOException;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
-
-import javax.servlet.ServletException;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
 
 import com.ning.http.client.AsyncHttpClient;
 import com.ning.http.client.AsyncHttpClientConfig;
@@ -33,8 +29,12 @@ import com.ning.http.client.Request;
 import com.ning.http.client.RequestBuilder;
 import com.ning.http.client.Response;
 
+import org.eclipse.jetty.http.HttpFields;
+import org.eclipse.jetty.http.HttpHeader;
 import org.eclipse.jetty.http.HttpStatus;
-import org.eclipse.jetty.server.handler.AbstractHandler;
+import org.eclipse.jetty.io.Content;
+import org.eclipse.jetty.server.Handler;
+import org.eclipse.jetty.util.Callback;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
@@ -60,7 +60,7 @@ public class RedirectTimeoutTest extends AbstractBasicTest {
     private  AsyncHttpClientConfig clientConfig ;
 
     @Override
-    public AbstractHandler configureHandler() throws Exception {
+    public Handler.Abstract configureHandler() throws Exception {
         return new PostRedirectGetHandler();
     }
 
@@ -111,24 +111,29 @@ public class RedirectTimeoutTest extends AbstractBasicTest {
         }
     }
 
-    public static class PostRedirectGetHandler extends AbstractHandler {
+    public static class PostRedirectGetHandler extends Handler.Abstract {
         @Override
-        public void handle(String pathInContext, org.eclipse.jetty.server.Request request, HttpServletRequest httpRequest, final HttpServletResponse httpResponse) throws IOException, ServletException {
-            if(httpRequest.getRequestURI().endsWith(REDIRECT_PATH)){
-                httpResponse.setStatus(HttpStatus.FOUND_302);
-                httpResponse.setHeader("Location", FINAL_PATH);
+        public boolean handle(org.eclipse.jetty.server.Request request, org.eclipse.jetty.server.Response response,
+                              Callback callback)
+                throws Exception {
+            if(request.getHttpURI().getPath().endsWith(REDIRECT_PATH)){
+                response.setStatus(HttpStatus.FOUND_302);
+                final HttpFields.Mutable responseHeaders = response.getHeaders();
+                responseHeaders.put(HttpHeader.LOCATION, FINAL_PATH);
             }
-            else if (httpRequest.getRequestURI().endsWith(FINAL_PATH)) {
+            else if (request.getHttpURI().getPath().endsWith(FINAL_PATH)) {
                 try {
                     Thread.sleep(SLEEP_TIME);
-                    httpResponse.setStatus(HttpStatus.OK_200);
-                    httpResponse.getOutputStream().print(PAYLOAD);
+                    response.setStatus(HttpStatus.OK_200);
+                    Content.Sink.asOutputStream(response).write(PAYLOAD.getBytes());
                 }
                 catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
                 }
             }
-            httpResponse.getOutputStream().flush();
+            Content.Sink.asOutputStream(response).flush();
+            callback.succeeded();
+            return true;
         }
     }
 }

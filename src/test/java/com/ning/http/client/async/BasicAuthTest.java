@@ -1,4 +1,5 @@
 /*
+ * Copyright (c) 2025 Contributors to the Eclipse Foundation.
  * Copyright (c) 2017, 2020 Oracle and/or its affiliates. All rights reserved.
  * Copyright 2010 Ning, Inc.
  *
@@ -29,38 +30,32 @@ import com.ning.http.client.Realm;
 import com.ning.http.client.Realm.AuthScheme;
 import com.ning.http.client.Response;
 
-import org.apache.log4j.ConsoleAppender;
-import org.apache.log4j.Level;
-import org.apache.log4j.Logger;
-import org.apache.log4j.PatternLayout;
-import org.eclipse.jetty.security.ConstraintMapping;
-import org.eclipse.jetty.security.ConstraintSecurityHandler;
+import org.eclipse.jetty.http.HttpFields;
+import org.eclipse.jetty.http.HttpHeader;
+import org.eclipse.jetty.http.HttpStatus;
+import org.eclipse.jetty.io.Content;
+import org.eclipse.jetty.security.Constraint;
 import org.eclipse.jetty.security.HashLoginService;
 import org.eclipse.jetty.security.LoginService;
+import org.eclipse.jetty.security.SecurityHandler;
 import org.eclipse.jetty.security.authentication.BasicAuthenticator;
 import org.eclipse.jetty.security.authentication.DigestAuthenticator;
+import org.eclipse.jetty.server.Handler;
 import org.eclipse.jetty.server.Request;
 import org.eclipse.jetty.server.Server;
 import org.eclipse.jetty.server.ServerConnector;
-import org.eclipse.jetty.server.handler.AbstractHandler;
-import org.eclipse.jetty.server.handler.HandlerWrapper;
-import org.eclipse.jetty.util.security.Constraint;
+import org.eclipse.jetty.util.Callback;
+import org.eclipse.jetty.util.resource.ResourceFactory;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
-
-import javax.servlet.ServletException;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
 
 import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.net.URL;
-import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
+import java.nio.file.Paths;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
@@ -83,11 +78,6 @@ public abstract class BasicAuthTest extends AbstractBasicTest {
     @Override
     public void setUpGlobal() throws Exception {
         server = new Server();
-        Logger root = Logger.getRootLogger();
-        root.setLevel(Level.DEBUG);
-        ConsoleAppender appender = new ConsoleAppender();
-        appender.setLayout(new PatternLayout(AuthTimeoutTest.TTCC_CONVERSION_PATTERN));
-        root.addAppender(appender);
 
         port1 = findFreePort();
         ServerConnector listener = new ServerConnector(server);
@@ -97,32 +87,20 @@ public abstract class BasicAuthTest extends AbstractBasicTest {
 
         server.addConnector(listener);
 
-        LoginService loginService = new HashLoginService("MyRealm", "src/test/resources/realm.properties");
+        final LoginService loginService;
+        try (final ResourceFactory.Closeable rf = ResourceFactory.closeable()) {
+            loginService =
+                    new HashLoginService("MyRealm", rf.newResource(Paths.get("src/test/resources/realm.properties")));
+        }
         server.addBean(loginService);
 
-        Constraint constraint = new Constraint();
-        constraint.setName(Constraint.__BASIC_AUTH);
-        constraint.setRoles(new String[] { user, admin });
-        constraint.setAuthenticate(true);
+        final SecurityHandler.PathMapped _securityHandler = new SecurityHandler.PathMapped();
+        _securityHandler.put("/*", Constraint.from("BASIC", Constraint.Authorization.SPECIFIC_ROLE, user, admin));
+        _securityHandler.setAuthenticator(new BasicAuthenticator());
+        _securityHandler.setLoginService(loginService);
+        _securityHandler.setHandler(configureHandler());
 
-        ConstraintMapping mapping = new ConstraintMapping();
-        mapping.setConstraint(constraint);
-        mapping.setPathSpec("/*");
-
-        List<ConstraintMapping> cm = new ArrayList<>();
-        cm.add(mapping);
-
-        Set<String> knownRoles = new HashSet<>();
-        knownRoles.add(user);
-        knownRoles.add(admin);
-
-        ConstraintSecurityHandler security = new ConstraintSecurityHandler();
-        security.setConstraintMappings(cm, knownRoles);
-        security.setAuthenticator(new BasicAuthenticator());
-        security.setLoginService(loginService);
-        security.setHandler(configureHandler());
-
-        server.setHandler(security);
+        server.setHandler(_securityHandler);
         server.start();
         log.info("Local HTTP server started successfully");
     }
@@ -163,42 +141,31 @@ public abstract class BasicAuthTest extends AbstractBasicTest {
 
         server2.addConnector(connector);
 
-        LoginService loginService = new HashLoginService("MyRealm", "src/test/resources/realm.properties");
+        final LoginService loginService;
+        try (final ResourceFactory.Closeable rf = ResourceFactory.closeable()) {
+            loginService =
+                    new HashLoginService("MyRealm", rf.newResource(Paths.get("src/test/resources/realm.properties")));
+        }
         server2.addBean(loginService);
 
-        Constraint constraint = new Constraint();
-        constraint.setName(Constraint.__DIGEST_AUTH);
-        constraint.setRoles(new String[] { user, admin });
-        constraint.setAuthenticate(true);
-
-        ConstraintMapping mapping = new ConstraintMapping();
-        mapping.setConstraint(constraint);
-        mapping.setPathSpec("/*");
-
-        Set<String> knownRoles = new HashSet<>();
-        knownRoles.add(user);
-        knownRoles.add(admin);
-
-        ConstraintSecurityHandler security = new ConstraintSecurityHandler() {
+        final SecurityHandler.PathMapped _securityHandler = new SecurityHandler.PathMapped() {
 
             @Override
-            public void handle(String arg0, Request arg1, HttpServletRequest arg2, HttpServletResponse arg3) throws IOException, ServletException {
+            public boolean handle(Request request, org.eclipse.jetty.server.Response response, Callback callback)
+                    throws Exception {
+                final HttpFields requestHeaders = request.getHeaders();
                 System.err.println("request in security handler");
-                System.err.println("Authorization: " + arg2.getHeader("Authorization"));
-                System.err.println("RequestUri: " + arg2.getRequestURI());
-                super.handle(arg0, arg1, arg2, arg3);
+                System.err.println("Authorization: " + requestHeaders.get(HttpHeader.AUTHORIZATION));
+                System.err.println("RequestUri: " + request.getHttpURI().getPath());
+                return super.handle(request, response, callback);
             }
         };
+        _securityHandler.put("/*", Constraint.from("DIGEST", Constraint.Authorization.SPECIFIC_ROLE, user, admin));
+        _securityHandler.setAuthenticator(new DigestAuthenticator());
+        _securityHandler.setLoginService(loginService);
+        _securityHandler.setHandler(new RedirectHandler());
 
-        List<ConstraintMapping> cm = new ArrayList<>();
-        cm.add(mapping);
-
-        security.setConstraintMappings(cm, knownRoles);
-        security.setAuthenticator(new DigestAuthenticator());
-        security.setLoginService(loginService);
-        security.setHandler(new RedirectHandler());
-
-        server2.setHandler(security);
+        server2.setHandler(_securityHandler);
         server2.start();
     }
 
@@ -224,64 +191,77 @@ public abstract class BasicAuthTest extends AbstractBasicTest {
         serverNoAuth.stop();
     }
 
-    private class RedirectHandler extends HandlerWrapper {
+    private class RedirectHandler extends Handler.Abstract {
 
-        public void handle(String s, Request r, HttpServletRequest request, HttpServletResponse response) throws IOException, ServletException {
+        @Override
+        public boolean handle(Request request, org.eclipse.jetty.server.Response response, Callback callback)
+                throws Exception {
 
             System.err.println("redirecthandler");
-            System.err.println("request: " + request.getRequestURI());
+            System.err.println("request: " + request.getHttpURI().getPath());
 
-            if ("/uff".equals(request.getRequestURI())) {
+            final HttpFields requestHeaders = request.getHeaders();
+            final HttpFields.Mutable responseHeaders = response.getHeaders();
+            if ("/uff".equals(request.getHttpURI().getPath())) {
                 System.err.println("redirect to /bla");
-                response.setStatus(302);
-                response.setHeader("Location", "/bla");
-                response.getOutputStream().flush();
-                response.getOutputStream().close();
+                response.setStatus(HttpStatus.FOUND_302);
+                responseHeaders.put(HttpHeader.LOCATION, "/bla");
+                Content.Sink.asOutputStream(response).flush();
+                Content.Sink.asOutputStream(response).close();
 
             } else {
-                System.err.println("got redirected" + request.getRequestURI());
-                response.setStatus(200);
-                response.addHeader("X-Auth", request.getHeader("Authorization"));
-                response.addHeader("X-Content-Length", String.valueOf(request.getContentLength()));
+                System.err.println("got redirected" + request.getHttpURI().getPath());
+                response.setStatus(HttpStatus.OK_200);
+                responseHeaders.put("X-Auth", requestHeaders.get(HttpHeader.AUTHORIZATION));
+                responseHeaders.put("X-Content-Length", String.valueOf(request.getLength()));
                 byte[] b = "content".getBytes(UTF_8);
-                response.setContentLength(b.length);
-                response.getOutputStream().write(b);
-                response.getOutputStream().flush();
-                response.getOutputStream().close();
+                responseHeaders.put(HttpHeader.CONTENT_LENGTH, b.length);
+                Content.Sink.asOutputStream(response).write(b);
+                Content.Sink.asOutputStream(response).flush();
+                Content.Sink.asOutputStream(response).close();
             }
+            callback.succeeded();
+            return true;
         }
     }
 
-    private class SimpleHandler extends HandlerWrapper {
+    private class SimpleHandler extends Handler.Abstract {
 
-        public void handle(String s, Request r, HttpServletRequest request, HttpServletResponse response) throws IOException, ServletException {
-        	
-            if (request.getHeader("X-401") != null) {
-                response.setStatus(401);
-                response.setContentLength(0);
+        @Override
+        public boolean handle(Request request, org.eclipse.jetty.server.Response response, Callback callback)
+                throws Exception {
+            final HttpFields requestHeaders = request.getHeaders();
+            final HttpFields.Mutable responseHeaders = response.getHeaders();
+            if (requestHeaders.get("X-401") != null) {
+                response.setStatus(HttpStatus.UNAUTHORIZED_401);
+                responseHeaders.put(HttpHeader.CONTENT_LENGTH, 0L);
 
             } else {
-                response.addHeader("X-Auth", request.getHeader("Authorization"));
-                response.addHeader("X-Content-Length", String.valueOf(request.getContentLength()));
-                response.setStatus(200);
+                responseHeaders.put("X-Auth", requestHeaders.get(HttpHeader.AUTHORIZATION));
+                responseHeaders.put("X-Content-Length", String.valueOf(request.getLength()));
+                response.setStatus(HttpStatus.OK_200);
     
                 int size = 10 * 1024;
-                if (request.getContentLength() > 0) {
-                    size = request.getContentLength();
+                if (request.getLength() > 0) {
+                    size = (int) request.getLength();
                 }
                 byte[] bytes = new byte[size];
                 int contentLength = 0;
                 if (bytes.length > 0) {
-                    int read = request.getInputStream().read(bytes);
-                    if (read > 0) {
-                        contentLength = read;
-                        response.getOutputStream().write(bytes, 0, read);
+                    try (final InputStream in = Content.Source.asInputStream(request)) {
+                        int read = in.read(bytes);
+                        if (read > 0) {
+                            contentLength = read;
+                            Content.Sink.asOutputStream(response).write(bytes, 0, read);
+                        }
                     }
                 }
-                response.setContentLength(contentLength);
+                responseHeaders.put(HttpHeader.CONTENT_LENGTH, contentLength);
             }
-            response.getOutputStream().flush();
-            response.getOutputStream().close();
+            Content.Sink.asOutputStream(response).flush();
+            Content.Sink.asOutputStream(response).close();
+            callback.succeeded();
+            return true;
         }
     }
 
@@ -294,7 +274,7 @@ public abstract class BasicAuthTest extends AbstractBasicTest {
             Response resp = f.get(3, TimeUnit.SECONDS);
             assertNotNull(resp);
             assertNotNull(resp.getHeader("X-Auth"));
-            assertEquals(resp.getStatusCode(), HttpServletResponse.SC_OK);
+            assertEquals(resp.getStatusCode(), 200);
         }
     }
 
@@ -308,7 +288,7 @@ public abstract class BasicAuthTest extends AbstractBasicTest {
             Future<Response> f = r.execute();
             Response resp = f.get(3, TimeUnit.SECONDS);
             assertNotNull(resp, "Response shouldn't be null");
-            assertEquals(resp.getStatusCode(), HttpServletResponse.SC_OK, "Status code should be 200-OK");
+            assertEquals(resp.getStatusCode(), 200, "Status code should be 200-OK");
             assertNotNull(resp.getHeader("X-Auth"), "X-Auth shouldn't be null");
 
         } finally {
@@ -330,7 +310,7 @@ public abstract class BasicAuthTest extends AbstractBasicTest {
     }
 
     @Override
-    public AbstractHandler configureHandler() throws Exception {
+    public Handler.Abstract configureHandler() throws Exception {
         return new SimpleHandler();
     }
 
@@ -386,7 +366,7 @@ public abstract class BasicAuthTest extends AbstractBasicTest {
             Response resp = f.get(3, TimeUnit.SECONDS);
             assertNotNull(resp);
             assertNotNull(resp.getHeader("X-Auth"));
-            assertEquals(resp.getStatusCode(), HttpServletResponse.SC_OK);
+            assertEquals(resp.getStatusCode(), 200);
         } finally {
             stopServerNoAuth();
         }
@@ -414,7 +394,7 @@ public abstract class BasicAuthTest extends AbstractBasicTest {
             Response resp = f.get(30, TimeUnit.SECONDS);
             assertNotNull(resp);
             assertNotNull(resp.getHeader("X-Auth"));
-            assertEquals(resp.getStatusCode(), HttpServletResponse.SC_OK);
+            assertEquals(resp.getStatusCode(), 200);
             assertEquals(resp.getResponseBody(), "test");
         }
     }
@@ -434,7 +414,7 @@ public abstract class BasicAuthTest extends AbstractBasicTest {
             Response resp = f.get(3, TimeUnit.SECONDS);
             assertNotNull(resp);
             assertNotNull(resp.getHeader("X-Auth"));
-            assertEquals(resp.getStatusCode(), HttpServletResponse.SC_OK);
+            assertEquals(resp.getStatusCode(), 200);
             assertEquals(resp.getResponseBody(), fileContent);
         }
     }
@@ -454,7 +434,7 @@ public abstract class BasicAuthTest extends AbstractBasicTest {
             Response resp = f.get(3, TimeUnit.SECONDS);
             assertNotNull(resp);
             assertNotNull(resp.getHeader("X-Auth"));
-            assertEquals(resp.getStatusCode(), HttpServletResponse.SC_OK);
+            assertEquals(resp.getStatusCode(), 200);
             assertEquals(resp.getResponseBody(), fileContent);
         }
     }
@@ -474,7 +454,7 @@ public abstract class BasicAuthTest extends AbstractBasicTest {
             Response resp = f.get(3, TimeUnit.SECONDS);
             assertNotNull(resp);
             assertNotNull(resp.getHeader("X-Auth"));
-            assertEquals(resp.getStatusCode(), HttpServletResponse.SC_OK);
+            assertEquals(resp.getStatusCode(), 200);
             assertEquals(resp.getResponseBody(), fileContent);
         }
     }
@@ -488,7 +468,7 @@ public abstract class BasicAuthTest extends AbstractBasicTest {
             Response resp = f.get(3, TimeUnit.SECONDS);
             assertNotNull(resp);
             assertNotNull(resp.getHeader("X-Auth"));
-            assertEquals(resp.getStatusCode(), HttpServletResponse.SC_OK);
+            assertEquals(resp.getStatusCode(), 200);
         }
     }
 }

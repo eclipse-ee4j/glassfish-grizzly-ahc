@@ -1,4 +1,5 @@
 /*
+ * Copyright (c) 2025 Contributors to the Eclipse Foundation.
  * Copyright (c) 2017, 2018 Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2010-2012 Sonatype, Inc. All rights reserved.
  *
@@ -20,17 +21,20 @@ import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertTrue;
 import static org.testng.Assert.fail;
 
-import org.apache.commons.fileupload.FileItemIterator;
-import org.apache.commons.fileupload.FileItemStream;
-import org.apache.commons.fileupload.FileUploadException;
-import org.apache.commons.fileupload.servlet.ServletFileUpload;
-import org.apache.commons.fileupload.util.Streams;
+import jakarta.servlet.ServletException;
+import jakarta.servlet.http.HttpServlet;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import org.apache.commons.fileupload2.core.FileItemInput;
+import org.apache.commons.fileupload2.core.FileItemInputIterator;
+import org.apache.commons.fileupload2.core.FileUploadException;
+import org.apache.commons.fileupload2.jakarta.servlet6.JakartaServletFileUpload;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
+import org.eclipse.jetty.ee11.servlet.ServletContextHandler;
+import org.eclipse.jetty.ee11.servlet.ServletHolder;
 import org.eclipse.jetty.server.Server;
 import org.eclipse.jetty.server.ServerConnector;
-import org.eclipse.jetty.servlet.ServletContextHandler;
-import org.eclipse.jetty.servlet.ServletHolder;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
@@ -42,11 +46,6 @@ import com.ning.http.client.Response;
 import com.ning.http.client.multipart.ByteArrayPart;
 import com.ning.http.client.multipart.FilePart;
 import com.ning.http.client.multipart.StringPart;
-
-import javax.servlet.ServletException;
-import javax.servlet.http.HttpServlet;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
 
 import java.io.ByteArrayOutputStream;
 import java.io.File;
@@ -60,6 +59,7 @@ import java.io.Writer;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URL;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -393,23 +393,24 @@ public abstract class MultipartUploadTest extends AbstractBasicTest {
         @Override
         public void service(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
             // Check that we have a file upload request
-            boolean isMultipart = ServletFileUpload.isMultipartContent(request);
+            boolean isMultipart = JakartaServletFileUpload.isMultipartContent(request);
             if (isMultipart) {
                 List<String> files = new ArrayList<>();
-                ServletFileUpload upload = new ServletFileUpload();
+                JakartaServletFileUpload upload = new JakartaServletFileUpload();
                 // Parse the request
-                FileItemIterator iter = null;
+                FileItemInputIterator iter = null;
                 try {
                     iter = upload.getItemIterator(request);
                     while (iter.hasNext()) {
-                        FileItemStream item = iter.next();
+                        FileItemInput item = iter.next();
                         String name = item.getFieldName();
                         InputStream stream = null;
                         try {
-                            stream = item.openStream();
+                            stream = item.getInputStream();
 
                             if (item.isFormField()) {
-                                System.out.println("Form field " + name + " with value " + Streams.asString(stream) + " detected.");
+                                System.out.println("Form field " + name + " with value " +
+                                                   IOUtils.toString(stream, StandardCharsets.UTF_8) + " detected.");
                                 incrementStringsProcessed();
                             } else {
                                 System.out.println("File field " + name + " with file name " + item.getName() + " detected.");

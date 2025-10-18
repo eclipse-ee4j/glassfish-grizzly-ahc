@@ -1,4 +1,5 @@
 /*
+ * Copyright (c) 2025 Contributors to the Eclipse Foundation.
  * Copyright (c) 2017, 2018 Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2010-2012 Sonatype, Inc. All rights reserved.
  *
@@ -17,14 +18,12 @@ package com.ning.http.client.async;
 import static org.testng.Assert.*;
 
 import java.io.ByteArrayOutputStream;
-import java.io.IOException;
 import java.util.concurrent.Future;
 
-import javax.servlet.ServletException;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
-
-import org.eclipse.jetty.server.handler.AbstractHandler;
+import org.eclipse.jetty.http.HttpStatus;
+import org.eclipse.jetty.server.Handler;
+import org.eclipse.jetty.server.Request;
+import org.eclipse.jetty.util.Callback;
 import org.testng.annotations.Test;
 
 import com.ning.http.client.AsyncHttpClient;
@@ -75,12 +74,15 @@ public class SimpleAsyncClientErrorBehaviourTest extends AbstractBasicTest {
     }
 
     @Override
-    public AbstractHandler configureHandler() throws Exception {
-        return new AbstractHandler() {
+    public Handler.Abstract configureHandler() throws Exception {
+        return new Handler.Abstract() {
 
-            public void handle(String target, org.eclipse.jetty.server.Request baseRequest, HttpServletRequest request, HttpServletResponse response) throws IOException, ServletException {
-                response.sendError(404);
-                baseRequest.setHandled(true);
+            @Override
+            public boolean handle(Request request, org.eclipse.jetty.server.Response response, Callback callback)
+                    throws Exception {
+                org.eclipse.jetty.server.Response.writeError(request, response, callback, HttpStatus.NOT_FOUND_404);
+                callback.succeeded();
+                return true;
             }
         };
     }

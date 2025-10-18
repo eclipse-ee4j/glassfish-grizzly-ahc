@@ -1,4 +1,5 @@
 /*
+ * Copyright (c) 2025 Contributors to the Eclipse Foundation.
  * Copyright (c) 2017, 2018 Oracle and/or its affiliates. All rights reserved.
  * Copyright 2010 Ning, Inc.
  *
@@ -23,18 +24,21 @@ import com.ning.http.client.AsyncHttpClientConfig;
 import com.ning.http.client.HttpResponseBodyPart;
 import com.ning.http.client.HttpResponseHeaders;
 import com.ning.http.client.HttpResponseStatus;
+import org.eclipse.jetty.http.HttpFields;
+import org.eclipse.jetty.http.HttpHeader;
+import org.eclipse.jetty.http.HttpStatus;
+import org.eclipse.jetty.io.Content;
+import org.eclipse.jetty.server.Handler;
 import org.eclipse.jetty.server.Request;
 import org.eclipse.jetty.server.Server;
 import org.eclipse.jetty.server.ServerConnector;
-import org.eclipse.jetty.server.handler.AbstractHandler;
+import org.eclipse.jetty.util.Callback;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
-import javax.servlet.ServletException;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
+import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ExecutionException;
@@ -87,16 +91,22 @@ public abstract class RC10KTest extends AbstractBasicTest {
     }
 
     @Override
-    public AbstractHandler configureHandler() throws Exception {
-        return new AbstractHandler() {
-            public void handle(String s, Request r, HttpServletRequest req, HttpServletResponse resp) throws IOException, ServletException {
-                resp.setContentType("text/pain");
-                String arg = s.substring(1);
-                resp.setHeader(ARG_HEADER, arg);
-                resp.setStatus(200);
-                resp.getOutputStream().print(arg);
-                resp.getOutputStream().flush();
-                resp.getOutputStream().close();
+    public Handler.Abstract configureHandler() throws Exception {
+        return new Handler.Abstract() {
+            @Override
+            public boolean handle(Request request, org.eclipse.jetty.server.Response response, Callback callback)
+                    throws Exception {
+                final HttpFields.Mutable responseHeaders = response.getHeaders();
+                responseHeaders.put(HttpHeader.CONTENT_TYPE, "text/pain");
+                String arg = request.getHttpURI().getPath().substring(1);
+                responseHeaders.put(ARG_HEADER, arg);
+                response.setStatus(HttpStatus.OK_200);
+                try (final OutputStream out = Content.Sink.asOutputStream(response)) {
+                    out.write(arg.getBytes());
+                    out.flush();
+                }
+                callback.succeeded();
+                return true;
             }
         };
     }

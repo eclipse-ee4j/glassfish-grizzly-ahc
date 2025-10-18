@@ -54,9 +54,9 @@ public abstract class CloseCodeReasonMessageTest extends TextMessageTest {
 
             latch.await();
             // code-reason
-            final String[] parts = text.get().split("[ -]");
+            final String[] parts = text.get().split("[-]");
             assertEquals(Integer.parseInt(parts[0]), 1001);
-            assertEquals(parts[1], "java.util.concurrent.TimeoutException:");
+            assertEquals(parts[1], "Connection Idle Timeout");
         }
     }
 

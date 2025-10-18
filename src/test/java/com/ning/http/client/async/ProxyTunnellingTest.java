@@ -1,4 +1,5 @@
 /*
+ * Copyright (c) 2025 Contributors to the Eclipse Foundation.
  * Copyright (c) 2017, 2018 Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2010-2012 Sonatype, Inc. All rights reserved.
  *
@@ -22,19 +23,17 @@ import com.ning.http.client.RequestBuilder;
 import com.ning.http.client.Response;
 import com.ning.http.client.SimpleAsyncHttpClient;
 import org.eclipse.jetty.http.HttpVersion;
-import org.eclipse.jetty.proxy.ConnectHandler;
+import org.eclipse.jetty.server.Handler;
 import org.eclipse.jetty.server.HttpConfiguration;
 import org.eclipse.jetty.server.HttpConnectionFactory;
 import org.eclipse.jetty.server.SecureRequestCustomizer;
 import org.eclipse.jetty.server.Server;
 import org.eclipse.jetty.server.ServerConnector;
 import org.eclipse.jetty.server.SslConnectionFactory;
-import org.eclipse.jetty.server.handler.HandlerWrapper;
 import org.eclipse.jetty.util.ssl.SslContextFactory;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
-import javax.servlet.http.HttpServletResponse;
 import java.io.File;
 import java.io.IOException;
 import java.net.URL;
@@ -53,8 +52,8 @@ public abstract class ProxyTunnellingTest extends AbstractBasicTest {
 
     private Server server2;
 
-    public HandlerWrapper configureHandler() throws Exception {
-        return  new ConnectHandler();
+    public Handler.Abstract configureHandler() throws Exception {
+        return  new org.eclipse.jetty.server.handler.ConnectHandler();
     }
 
     @BeforeClass(alwaysRun = true)
@@ -77,7 +76,7 @@ public abstract class ProxyTunnellingTest extends AbstractBasicTest {
         https_config.setSecurePort(port2);
         https_config.setOutputBufferSize(32768);
 
-        SslContextFactory sslContextFactory = new SslContextFactory.Server();
+        SslContextFactory.Server sslContextFactory = new SslContextFactory.Server();
         ClassLoader cl = getClass().getClassLoader();
         URL cacertsUrl = cl.getResource("ssltest-cacerts.jks");
         String trustStoreFile = new File(cacertsUrl.toURI()).getAbsolutePath();
@@ -206,7 +205,7 @@ public abstract class ProxyTunnellingTest extends AbstractBasicTest {
             Response resp = client.prepareGet(getTargetUrl2()).setProxyServer(new ProxyServer("127.0.0.1", port1 - 1).addNonProxyHost("127.0.0.1")).execute().get(3, TimeUnit.SECONDS);
 
             assertNotNull(resp);
-            assertEquals(resp.getStatusCode(), HttpServletResponse.SC_OK);
+            assertEquals(resp.getStatusCode(), 200);
             assertEquals(resp.getHeader("X-pathInfo"), "/foo/test");
         }
     }

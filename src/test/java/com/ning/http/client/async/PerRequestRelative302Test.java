@@ -1,4 +1,5 @@
 /*
+ * Copyright (c) 2025 Contributors to the Eclipse Foundation.
  * Copyright (c) 2017, 2018 Oracle and/or its affiliates. All rights reserved.
  * Copyright 2010 Ning, Inc.
  *
@@ -22,20 +23,20 @@ import com.ning.http.client.AsyncHttpClientConfig;
 import com.ning.http.client.Response;
 import com.ning.http.client.uri.Uri;
 
+import org.eclipse.jetty.http.HttpField;
+import org.eclipse.jetty.http.HttpFields;
+import org.eclipse.jetty.http.HttpHeader;
+import org.eclipse.jetty.http.HttpStatus;
+import org.eclipse.jetty.io.Content;
+import org.eclipse.jetty.server.Handler;
 import org.eclipse.jetty.server.Request;
 import org.eclipse.jetty.server.Server;
 import org.eclipse.jetty.server.ServerConnector;
-import org.eclipse.jetty.server.handler.HandlerWrapper;
+import org.eclipse.jetty.util.Callback;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
-import javax.servlet.ServletException;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
-
-import java.io.IOException;
 import java.net.ConnectException;
-import java.util.Enumeration;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -48,27 +49,31 @@ public abstract class PerRequestRelative302Test extends AbstractBasicTest {
     // FIXME super NOT threadsafe!!!
     private final AtomicBoolean isSet = new AtomicBoolean(false);
 
-    private class Relative302Handler extends HandlerWrapper {
+    private class Relative302Handler extends Handler.Abstract {
 
-        public void handle(String s, Request r, HttpServletRequest httpRequest, HttpServletResponse httpResponse) throws IOException, ServletException {
-
+        @Override
+        public boolean handle(Request request, org.eclipse.jetty.server.Response response, Callback callback)
+                throws Exception {
+            final HttpFields requestHeaders = request.getHeaders();
+            final HttpFields.Mutable responseHeaders = response.getHeaders();
             String param;
-            httpResponse.setContentType("text/html; charset=utf-8");
-            Enumeration<?> e = httpRequest.getHeaderNames();
-            while (e.hasMoreElements()) {
-                param = e.nextElement().toString();
-
+            responseHeaders.put(HttpHeader.CONTENT_TYPE, "text/html; charset=utf-8");
+            for (final HttpField field : requestHeaders) {
+                param = field.getName();
                 if (param.startsWith("X-redirect") && !isSet.getAndSet(true)) {
-                    httpResponse.addHeader("Location", httpRequest.getHeader(param));
-                    httpResponse.setStatus(302);
-                    httpResponse.getOutputStream().flush();
-                    httpResponse.getOutputStream().close();
-                    return;
+                    responseHeaders.put(HttpHeader.LOCATION, field.getValue());
+                    response.setStatus(HttpStatus.FOUND_302);
+                    Content.Sink.asOutputStream(response).flush();
+                    Content.Sink.asOutputStream(response).close();
+                    callback.succeeded();
+                    return true;
                 }
             }
-            httpResponse.setStatus(200);
-            httpResponse.getOutputStream().flush();
-            httpResponse.getOutputStream().close();
+            response.setStatus(HttpStatus.OK_200);
+            Content.Sink.asOutputStream(response).flush();
+            Content.Sink.asOutputStream(response).close();
+            callback.succeeded();
+            return true;
         }
     }
 

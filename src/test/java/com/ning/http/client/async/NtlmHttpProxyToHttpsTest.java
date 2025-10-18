@@ -1,4 +1,5 @@
 /*
+ * Copyright (c) 2025 Contributors to the Eclipse Foundation.
  * Copyright (c) 2017, 2018 Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2015 AsyncHttpClient Project. All rights reserved.
  *
@@ -33,21 +34,20 @@ import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import javax.servlet.ServletException;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
-
+import org.eclipse.jetty.http.HttpFields;
+import org.eclipse.jetty.http.HttpHeader;
 import org.eclipse.jetty.http.HttpMethod;
 import org.eclipse.jetty.http.HttpStatus;
 import org.eclipse.jetty.http.HttpVersion;
-import org.eclipse.jetty.proxy.ConnectHandler;
+import org.eclipse.jetty.io.Content;
+import org.eclipse.jetty.server.Handler;
 import org.eclipse.jetty.server.HttpConfiguration;
 import org.eclipse.jetty.server.HttpConnectionFactory;
 import org.eclipse.jetty.server.SecureRequestCustomizer;
 import org.eclipse.jetty.server.Server;
 import org.eclipse.jetty.server.ServerConnector;
 import org.eclipse.jetty.server.SslConnectionFactory;
-import org.eclipse.jetty.server.handler.AbstractHandler;
+import org.eclipse.jetty.util.Callback;
 import org.eclipse.jetty.util.ssl.SslContextFactory;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
@@ -93,7 +93,7 @@ public abstract class NtlmHttpProxyToHttpsTest extends AbstractBasicTest {
     https_config.addCustomizer(src);
 
     ClassLoader cl = getClass().getClassLoader();
-    SslContextFactory sslContextFactory = new SslContextFactory.Server();
+    final SslContextFactory.Server sslContextFactory = new SslContextFactory.Server();
     URL cacertsUrl = cl.getResource("ssltest-cacerts.jks");
     String trustStoreFile = new File(cacertsUrl.toURI()).getAbsolutePath();
     sslContextFactory.setTrustStorePath(trustStoreFile);
@@ -123,16 +123,16 @@ public abstract class NtlmHttpProxyToHttpsTest extends AbstractBasicTest {
   }
 
   @Override
-  public AbstractHandler configureHandler() throws Exception {
-    return new ConnectHandler(new EchoHandler()) {
+  public Handler.Abstract configureHandler() throws Exception {
+    return new org.eclipse.jetty.server.handler.ConnectHandler(new EchoHandler()) {
       AtomicInteger state = new AtomicInteger(1);
       AtomicBoolean authComplete = new AtomicBoolean(false);
       @Override
-      public void handle(String pathInContext, org.eclipse.jetty.server.Request request,
-                         HttpServletRequest httpRequest, HttpServletResponse httpResponse)
-              throws IOException,ServletException {
-
-        String authorization = httpRequest.getHeader("Proxy-Authorization");
+      public boolean handle(org.eclipse.jetty.server.Request request, org.eclipse.jetty.server.Response response,
+                            Callback callback) throws Exception {
+        final HttpFields requestHeaders = request.getHeaders();
+        final HttpFields.Mutable responseHeaders = response.getHeaders();
+        final String authorization = requestHeaders.get(HttpHeader.PROXY_AUTHORIZATION);
 
         boolean asExpected = false;
 
@@ -140,8 +140,9 @@ public abstract class NtlmHttpProxyToHttpsTest extends AbstractBasicTest {
 
           case 1:
             if (authorization.equals("NTLM TlRMTVNTUAABAAAAAYIIogAAAAAoAAAAAAAAACgAAAAFASgKAAAADw==")) {
-              httpResponse.setStatus(HttpStatus.PROXY_AUTHENTICATION_REQUIRED_407);
-              httpResponse.setHeader("Proxy-Authenticate", "NTLM TlRMTVNTUAACAAAAAAAAACgAAAABggAAU3J2Tm9uY2UAAAAAAAAAAA==");
+                response.setStatus(HttpStatus.PROXY_AUTHENTICATION_REQUIRED_407);
+                responseHeaders.put(HttpHeader.PROXY_AUTHENTICATE,
+                                    "NTLM TlRMTVNTUAACAAAAAAAAACgAAAABggAAU3J2Tm9uY2UAAAAAAAAAAA==");
               asExpected = true;
 
             }
@@ -150,8 +151,9 @@ public abstract class NtlmHttpProxyToHttpsTest extends AbstractBasicTest {
           case 2:
             if (authorization
                     .equals("NTLM TlRMTVNTUAADAAAAGAAYAEgAAAAYABgAYAAAABQAFAB4AAAADAAMAIwAAAASABIAmAAAAAAAAACqAAAAAYIAAgUBKAoAAAAPrYfKbe/jRoW5xDxHeoxC1gBmfWiS5+iX4OAN4xBKG/IFPwfH3agtPEia6YnhsADTVQBSAFMAQQAtAE0ASQBOAE8AUgBaAGEAcABoAG8AZABMAGkAZwBoAHQAQwBpAHQAeQA=")) {
-              httpResponse.setStatus(HttpStatus.OK_200);
-              super.handleConnect(request,httpRequest,httpResponse,request.getRequestURI());
+              response.setStatus(HttpStatus.OK_200);
+              super.handleConnect(request, response, callback,
+                                  request.getHttpURI().getHost() + ":" + request.getHttpURI().getPort());
               asExpected = true;
               authComplete.getAndSet(true);
             }
@@ -160,14 +162,18 @@ public abstract class NtlmHttpProxyToHttpsTest extends AbstractBasicTest {
         }
 
         if (!asExpected) {
-          httpResponse.setStatus(HttpStatus.FORBIDDEN_403);
+          response.setStatus(HttpStatus.FORBIDDEN_403);
         }
-        if (authComplete.get() && HttpMethod.GET.is(httpRequest.getMethod())) {
-          super.handle(pathInContext,request,httpRequest,httpResponse);
+        if (authComplete.get() && HttpMethod.GET.is(request.getMethod())) {
+          super.handle(request, response, callback);
         }
-        httpResponse.setContentLength(0);
-        httpResponse.getOutputStream().flush();
-        httpResponse.getOutputStream().close();
+        responseHeaders.put(HttpHeader.CONTENT_LENGTH, 0L);
+        Content.Sink.asOutputStream(response).flush();
+        Content.Sink.asOutputStream(response).close();
+        if (!authComplete.get()) {
+          callback.succeeded();
+        }
+        return true;
       }
     };
   }
@@ -181,7 +187,7 @@ public abstract class NtlmHttpProxyToHttpsTest extends AbstractBasicTest {
       Future<Response> responseFuture = client.executeRequest(request);
       Response response = responseFuture.get();
       Assert.assertNotNull(response);
-      Assert.assertEquals(response.getStatusCode(), HttpServletResponse.SC_OK);
+      Assert.assertEquals(response.getStatusCode(), 200);
       Assert.assertEquals("127.0.0.1:" + port2, response.getHeader("x-host"));
     }
   }

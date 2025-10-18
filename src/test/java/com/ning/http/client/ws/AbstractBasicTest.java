@@ -1,4 +1,5 @@
 /*
+ * Copyright 2025 Contributors to the Eclipse Foundation.
  * Copyright (c) 2017, 2018 Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2010-2012 Sonatype, Inc. All rights reserved.
  *
@@ -16,11 +17,12 @@ package com.ning.http.client.ws;
 
 import com.ning.http.client.AsyncHttpClient;
 import com.ning.http.client.AsyncHttpClientConfig;
+import org.eclipse.jetty.ee11.servlet.ServletContextHandler;
+import org.eclipse.jetty.ee11.servlet.ServletHolder;
+import org.eclipse.jetty.ee11.websocket.server.JettyWebSocketServlet;
+import org.eclipse.jetty.ee11.websocket.server.config.JettyWebSocketServletContainerInitializer;
 import org.eclipse.jetty.server.Server;
 import org.eclipse.jetty.server.ServerConnector;
-import org.eclipse.jetty.servlet.ServletContextHandler;
-import org.eclipse.jetty.servlet.ServletHolder;
-import org.eclipse.jetty.websocket.servlet.WebSocketServlet;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testng.annotations.AfterClass;
@@ -57,17 +59,18 @@ public abstract class AbstractBasicTest extends Server {
         _connector.setPort(port1);
 
         addConnector(_connector);
-        WebSocketServlet _wsHandler = getWebSocketHandler();
+        JettyWebSocketServlet _wsHandler = getWebSocketHandler();
         ServletContextHandler context = new ServletContextHandler(ServletContextHandler.SESSIONS);
         context.setContextPath("/");
         getServer().setHandler(context);
         ServletHolder echo = new ServletHolder(_wsHandler);
         context.addServlet(echo, "/*");
+        JettyWebSocketServletContainerInitializer.configure(context, null);
         start();
         log.info("Local HTTP server started successfully");
     }
 
-    public abstract WebSocketServlet getWebSocketHandler();
+    public abstract JettyWebSocketServlet getWebSocketHandler();
 
     public abstract AsyncHttpClient getAsyncHttpClient(AsyncHttpClientConfig config);
 

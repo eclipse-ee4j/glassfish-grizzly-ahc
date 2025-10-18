@@ -1,4 +1,5 @@
 /*
+ * Copyright (c) 2025 Contributors to the Eclipse Foundation.
  * Copyright (c) 2017, 2020 Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2010-2012 Sonatype, Inc. All rights reserved.
  *
@@ -17,32 +18,26 @@ package com.ning.http.client.async;
 import com.ning.http.client.AsyncHttpClient;
 import com.ning.http.client.Realm;
 import com.ning.http.client.Response;
-import org.apache.log4j.ConsoleAppender;
-import org.apache.log4j.Level;
-import org.apache.log4j.Logger;
-import org.apache.log4j.PatternLayout;
-import org.eclipse.jetty.security.ConstraintMapping;
-import org.eclipse.jetty.security.ConstraintSecurityHandler;
+import org.eclipse.jetty.http.HttpFields;
+import org.eclipse.jetty.http.HttpHeader;
+import org.eclipse.jetty.http.HttpStatus;
+import org.eclipse.jetty.io.Content;
+import org.eclipse.jetty.security.Constraint;
 import org.eclipse.jetty.security.HashLoginService;
 import org.eclipse.jetty.security.LoginService;
+import org.eclipse.jetty.security.SecurityHandler;
 import org.eclipse.jetty.security.authentication.DigestAuthenticator;
+import org.eclipse.jetty.server.Handler;
 import org.eclipse.jetty.server.Request;
 import org.eclipse.jetty.server.Server;
 import org.eclipse.jetty.server.ServerConnector;
-import org.eclipse.jetty.server.handler.AbstractHandler;
-import org.eclipse.jetty.server.handler.HandlerWrapper;
-import org.eclipse.jetty.util.security.Constraint;
+import org.eclipse.jetty.util.Callback;
+import org.eclipse.jetty.util.resource.ResourceFactory;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
-import javax.servlet.ServletException;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
+import java.nio.file.Paths;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
@@ -60,11 +55,6 @@ public abstract class DigestAuthTest extends AbstractBasicTest {
     @Override
     public void setUpGlobal() throws Exception {
         server = new Server();
-        Logger root = Logger.getRootLogger();
-        root.setLevel(Level.DEBUG);
-        ConsoleAppender appender = new ConsoleAppender();
-        appender.setLayout(new PatternLayout(AuthTimeoutTest.TTCC_CONVERSION_PATTERN));
-        root.addAppender(appender);
 
         port1 = findFreePort();
         ServerConnector listener = new ServerConnector(server);
@@ -74,43 +64,35 @@ public abstract class DigestAuthTest extends AbstractBasicTest {
 
         server.addConnector(listener);
 
-        LoginService loginService = new HashLoginService("MyRealm", "src/test/resources/realm.properties");
+        final LoginService loginService;
+        try (final ResourceFactory.Closeable rf = ResourceFactory.closeable()) {
+            loginService =
+                    new HashLoginService("MyRealm", rf.newResource(Paths.get("src/test/resources/realm.properties")));
+        }
         server.addBean(loginService);
 
-        Constraint constraint = new Constraint();
-        constraint.setName(Constraint.__BASIC_AUTH);
-        constraint.setRoles(new String[] { user, admin });
-        constraint.setAuthenticate(true);
-
-        ConstraintMapping mapping = new ConstraintMapping();
-        mapping.setConstraint(constraint);
-        mapping.setPathSpec("/*");
-
-        List<ConstraintMapping> cm = new ArrayList<>();
-        cm.add(mapping);
-
-        Set<String> knownRoles = new HashSet<>();
-        knownRoles.add(user);
-        knownRoles.add(admin);
-
-        ConstraintSecurityHandler security = new ConstraintSecurityHandler();
-        security.setConstraintMappings(cm, knownRoles);
-        security.setAuthenticator(new DigestAuthenticator());
-        security.setLoginService(loginService);
-
-        security.setHandler(configureHandler());
-        server.setHandler(security);
+        final SecurityHandler.PathMapped _securityHandler = new SecurityHandler.PathMapped();
+        _securityHandler.put("/*", Constraint.from("BASIC", Constraint.Authorization.SPECIFIC_ROLE, user, admin));
+        _securityHandler.setAuthenticator(new DigestAuthenticator());
+        _securityHandler.setLoginService(loginService);
+        _securityHandler.setHandler(configureHandler());
+        server.setHandler(_securityHandler);
         server.start();
         log.info("Local HTTP server started successfully");
     }
 
-    private class SimpleHandler extends HandlerWrapper {
-        public void handle(String s, Request r, HttpServletRequest request, HttpServletResponse response) throws IOException, ServletException {
-
-            response.addHeader("X-Auth", request.getHeader("Authorization"));
-            response.setStatus(200);
-            response.getOutputStream().flush();
-            response.getOutputStream().close();
+    private class SimpleHandler extends Handler.Abstract {
+        @Override
+        public boolean handle(Request request, org.eclipse.jetty.server.Response response, Callback callback)
+                throws Exception {
+            final HttpFields requestHeaders = request.getHeaders();
+            final HttpFields.Mutable responseHeaders = response.getHeaders();
+            responseHeaders.put("X-Auth", requestHeaders.get(HttpHeader.AUTHORIZATION));
+            response.setStatus(HttpStatus.OK_200);
+            Content.Sink.asOutputStream(response).flush();
+            Content.Sink.asOutputStream(response).close();
+            callback.succeeded();
+            return true;
         }
     }
 
@@ -122,7 +104,7 @@ public abstract class DigestAuthTest extends AbstractBasicTest {
             Future<Response> f = r.execute();
             Response resp = f.get(60, TimeUnit.SECONDS);
             assertNotNull(resp);
-            assertEquals(resp.getStatusCode(), HttpServletResponse.SC_OK);
+            assertEquals(resp.getStatusCode(), 200);
             assertNotNull(resp.getHeader("X-Auth"));
         }
     }
@@ -135,7 +117,7 @@ public abstract class DigestAuthTest extends AbstractBasicTest {
             Future<Response> f = r.execute();
             Response resp = f.get(60, TimeUnit.SECONDS);
             assertNotNull(resp);
-            assertEquals(resp.getStatusCode(), HttpServletResponse.SC_OK);
+            assertEquals(resp.getStatusCode(), 200);
             assertNotNull(resp.getHeader("X-Auth"));
         }
     }
@@ -153,7 +135,7 @@ public abstract class DigestAuthTest extends AbstractBasicTest {
     }
 
     @Override
-    public AbstractHandler configureHandler() throws Exception {
+    public Handler.Abstract configureHandler() throws Exception {
         return new SimpleHandler();
     }
 }

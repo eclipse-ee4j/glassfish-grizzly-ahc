@@ -1,4 +1,5 @@
 /*
+ * Copyright 2025 Contributors to the Eclipse Foundation.
  * Copyright (c) 2017, 2018 Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2010-2012 Sonatype, Inc. All rights reserved.
  *
@@ -21,16 +22,17 @@ import com.ning.http.client.HttpResponseBodyPart;
 import com.ning.http.client.HttpResponseHeaders;
 import com.ning.http.client.HttpResponseStatus;
 import com.ning.http.client.Response;
+import org.eclipse.jetty.http.HttpStatus;
+import org.eclipse.jetty.io.Content;
+import org.eclipse.jetty.server.Handler;
 import org.eclipse.jetty.server.Request;
-import org.eclipse.jetty.server.handler.AbstractHandler;
+import org.eclipse.jetty.util.Callback;
 import org.testng.annotations.Test;
 
-import javax.servlet.ServletException;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.net.URISyntaxException;
 import java.net.URL;
 import java.util.concurrent.ExecutionException;
@@ -48,21 +50,27 @@ import static org.testng.Assert.assertTrue;
  */
 public abstract class ZeroCopyFileTest extends AbstractBasicTest {
 
-    private class ZeroCopyHandler extends AbstractHandler {
-        public void handle(String s, Request r, HttpServletRequest httpRequest, HttpServletResponse httpResponse) throws IOException, ServletException {
+    private class ZeroCopyHandler extends Handler.Abstract {
+        @Override
+        public boolean handle(Request request, org.eclipse.jetty.server.Response response, Callback callback)
+                throws Exception {
 
             int size = 10 * 1024;
-            if (httpRequest.getContentLength() > 0) {
-                size = httpRequest.getContentLength();
+            if (request.getLength() > 0) {
+                size = (int) request.getLength();
             }
             byte[] bytes = new byte[size];
             if (bytes.length > 0) {
-                httpRequest.getInputStream().read(bytes);
-                httpResponse.getOutputStream().write(bytes);
+                try (final InputStream in = Content.Source.asInputStream(request)) {
+                    in.read(bytes);
+                    Content.Sink.asOutputStream(response).write(bytes);
+                }
             }
 
-            httpResponse.setStatus(200);
-            httpResponse.getOutputStream().flush();
+            response.setStatus(HttpStatus.OK_200);
+            Content.Sink.asOutputStream(response).flush();
+            callback.succeeded();
+            return true;
         }
     }
 
@@ -95,7 +103,7 @@ public abstract class ZeroCopyFileTest extends AbstractBasicTest {
             });
             Response resp = f.get();
             assertNotNull(resp);
-            assertEquals(resp.getStatusCode(), HttpServletResponse.SC_OK);
+            assertEquals(resp.getStatusCode(), 200);
             assertEquals(resp.getResponseBody(), "This is a simple test file");
             assertTrue(operationCompleted.get());
             assertTrue(headerSent.get());
@@ -113,13 +121,13 @@ public abstract class ZeroCopyFileTest extends AbstractBasicTest {
             Future<Response> f = client.preparePut("http://127.0.0.1:" + port1 + "/").setBody(file).execute();
             Response resp = f.get();
             assertNotNull(resp);
-            assertEquals(resp.getStatusCode(), HttpServletResponse.SC_OK);
+            assertEquals(resp.getStatusCode(), 200);
             assertEquals(resp.getResponseBody(), "This is a simple test file");
         }
     }
 
     @Override
-    public AbstractHandler configureHandler() throws Exception {
+    public Handler.Abstract configureHandler() throws Exception {
         return new ZeroCopyHandler();
     }
 

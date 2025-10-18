@@ -1,4 +1,5 @@
 /*
+ * Copyright (c) 2025 Contributors to the Eclipse Foundation.
  * Copyright (c) 2017, 2018 Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2010-2012 Sonatype, Inc. All rights reserved.
  *
@@ -18,34 +19,39 @@ import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.fail;
 
+import org.eclipse.jetty.http.HttpFields;
+import org.eclipse.jetty.http.HttpHeader;
+import org.eclipse.jetty.http.HttpStatus;
+import org.eclipse.jetty.io.Content;
+import org.eclipse.jetty.server.Handler;
 import org.eclipse.jetty.server.Request;
-import org.eclipse.jetty.server.handler.AbstractHandler;
+import org.eclipse.jetty.server.Response;
+import org.eclipse.jetty.util.Callback;
 import org.testng.annotations.Test;
 
 import com.ning.http.client.AsyncHttpClient;
 import com.ning.http.client.AsyncHttpClientConfig;
 import com.ning.http.util.AsyncHttpProviderUtils;
 
-import javax.servlet.ServletException;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
-
 import java.io.IOException;
 import java.io.OutputStream;
 
 public abstract class RetryRequestTest extends AbstractBasicTest {
-    public static class SlowAndBigHandler extends AbstractHandler {
+    public static class SlowAndBigHandler extends Handler.Abstract {
 
-        public void handle(String pathInContext, Request request, HttpServletRequest httpRequest, HttpServletResponse httpResponse) throws IOException, ServletException {
+        @Override
+        public boolean handle(Request request, org.eclipse.jetty.server.Response response, Callback callback)
+                throws Exception {
 
+            final HttpFields.Mutable responseHeaders = response.getHeaders();
             int load = 100;
-            httpResponse.setStatus(200);
-            httpResponse.setContentLength(load);
-            httpResponse.setContentType("application/octet-stream");
+            response.setStatus(HttpStatus.OK_200);
+            responseHeaders.put(HttpHeader.CONTENT_LENGTH, load);
+            responseHeaders.put(HttpHeader.CONTENT_TYPE, "application/octet-stream");
 
-            httpResponse.flushBuffer();
+            Content.Sink.asOutputStream(response).flush();
 
-            OutputStream os = httpResponse.getOutputStream();
+            OutputStream os = Content.Sink.asOutputStream(response);
             for (int i = 0; i < load; i++) {
                 os.write(i % 255);
 
@@ -56,12 +62,14 @@ public abstract class RetryRequestTest extends AbstractBasicTest {
                 }
 
                 if (i > load / 10) {
-                    httpResponse.sendError(500);
+                    Response.writeError(request, response, callback, HttpStatus.INTERNAL_SERVER_ERROR_500);
                 }
             }
 
-            httpResponse.getOutputStream().flush();
-            httpResponse.getOutputStream().close();
+            Content.Sink.asOutputStream(response).flush();
+            Content.Sink.asOutputStream(response).close();
+            callback.succeeded();
+            return true;
         }
     }
 
@@ -70,7 +78,7 @@ public abstract class RetryRequestTest extends AbstractBasicTest {
     }
 
     @Override
-    public AbstractHandler configureHandler() throws Exception {
+    public Handler.Abstract configureHandler() throws Exception {
         return new SlowAndBigHandler();
     }
 

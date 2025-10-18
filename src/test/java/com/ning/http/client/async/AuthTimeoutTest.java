@@ -1,4 +1,5 @@
 /*
+ * Copyright (c) 2025 Contributors to the Eclipse Foundation.
  * Copyright (c) 2017, 2020 Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2010-2012 Sonatype, Inc. All rights reserved.
  *
@@ -18,31 +19,28 @@ import com.ning.http.client.AsyncHttpClient;
 import com.ning.http.client.AsyncHttpClientConfig;
 import com.ning.http.client.Realm;
 import com.ning.http.client.Response;
-import org.apache.log4j.ConsoleAppender;
-import org.apache.log4j.Level;
-import org.apache.log4j.Logger;
-import org.apache.log4j.PatternLayout;
-import org.eclipse.jetty.security.ConstraintMapping;
-import org.eclipse.jetty.security.ConstraintSecurityHandler;
+import org.eclipse.jetty.http.HttpFields;
+import org.eclipse.jetty.http.HttpHeader;
+import org.eclipse.jetty.http.HttpStatus;
+import org.eclipse.jetty.io.Content;
+import org.eclipse.jetty.security.Authenticator;
+import org.eclipse.jetty.security.Constraint;
 import org.eclipse.jetty.security.HashLoginService;
 import org.eclipse.jetty.security.LoginService;
+import org.eclipse.jetty.security.SecurityHandler;
 import org.eclipse.jetty.security.authentication.BasicAuthenticator;
+import org.eclipse.jetty.security.authentication.DigestAuthenticator;
+import org.eclipse.jetty.server.Handler;
 import org.eclipse.jetty.server.Request;
 import org.eclipse.jetty.server.Server;
 import org.eclipse.jetty.server.ServerConnector;
-import org.eclipse.jetty.server.handler.AbstractHandler;
-import org.eclipse.jetty.util.security.Constraint;
+import org.eclipse.jetty.util.Callback;
+import org.eclipse.jetty.util.resource.ResourceFactory;
 import org.testng.annotations.Test;
 
-import javax.servlet.ServletException;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.io.OutputStream;
-import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
+import java.nio.file.Paths;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 
@@ -64,11 +62,6 @@ public abstract class AuthTimeoutTest extends AbstractBasicTest {
 
     public void setUpServer(String auth) throws Exception {
         server = new Server();
-        Logger root = Logger.getRootLogger();
-        root.setLevel(Level.DEBUG);
-        ConsoleAppender appender = new ConsoleAppender();
-        appender.setLayout(new PatternLayout(TTCC_CONVERSION_PATTERN));
-        root.addAppender(appender);
 
         port1 = findFreePort();
         ServerConnector listener = new ServerConnector(server);
@@ -78,61 +71,64 @@ public abstract class AuthTimeoutTest extends AbstractBasicTest {
 
         server.addConnector(listener);
 
-        LoginService loginService = new HashLoginService("MyRealm", "src/test/resources/realm.properties");
+        final LoginService loginService;
+        try (final ResourceFactory.Closeable rf = ResourceFactory.closeable()) {
+            loginService =
+                    new HashLoginService("MyRealm", rf.newResource(Paths.get("src/test/resources/realm.properties")));
+        }
         server.addBean(loginService);
 
-        Constraint constraint = new Constraint();
-        constraint.setName(auth);
-        constraint.setRoles(new String[] { user, admin });
-        constraint.setAuthenticate(true);
+        final SecurityHandler.PathMapped _securityHandler = new SecurityHandler.PathMapped();
+        _securityHandler.put("/*", Constraint.from(auth, Constraint.Authorization.SPECIFIC_ROLE, user, admin));
+        final Authenticator authenticator;
+        if (auth != null && auth.equals("BASIC")) {
+            authenticator = new BasicAuthenticator();
+        } else if (auth != null && auth.equals("DIGEST")) {
+            authenticator = new DigestAuthenticator();
+        } else {
+            authenticator = new BasicAuthenticator();
+        }
+        _securityHandler.setAuthenticator(authenticator);
+        _securityHandler.setLoginService(loginService);
+        _securityHandler.setHandler(configureHandler());
 
-        ConstraintMapping mapping = new ConstraintMapping();
-        mapping.setConstraint(constraint);
-        mapping.setPathSpec("/*");
-
-        Set<String> knownRoles = new HashSet<>();
-        knownRoles.add(user);
-        knownRoles.add(admin);
-
-        ConstraintSecurityHandler security = new ConstraintSecurityHandler();
-
-        List<ConstraintMapping> cm = new ArrayList<>();
-        cm.add(mapping);
-
-        security.setConstraintMappings(cm, knownRoles);
-        security.setAuthenticator(new BasicAuthenticator());
-        security.setLoginService(loginService);
-        security.setHandler(configureHandler());
-
-        server.setHandler(security);
+        server.setHandler(_securityHandler);
         server.start();
         log.info("Local HTTP server started successfully");
     }
 
-    private class SimpleHandler extends AbstractHandler {
-        public void handle(String s, Request r, HttpServletRequest request, HttpServletResponse response) throws IOException, ServletException {
+
+    private class SimpleHandler extends Handler.Abstract {
+        @Override
+        public boolean handle(Request request, org.eclipse.jetty.server.Response response, Callback callback)
+                throws Exception {
 
             // NOTE: handler sends less bytes than are given in Content-Length, which should lead to timeout
 
-            OutputStream out = response.getOutputStream();
-            if (request.getHeader("X-Content") != null) {
-                String content = request.getHeader("X-Content");
-                response.setHeader("Content-Length", String.valueOf(content.getBytes("UTF-8").length));
+            final HttpFields requestHeaders = request.getHeaders();
+            final HttpFields.Mutable responseHeaders = response.getHeaders();
+            final OutputStream out = Content.Sink.asOutputStream(response);
+            if (requestHeaders.get("X-Content") != null) {
+                String content = requestHeaders.get("X-Content");
+                responseHeaders.put(HttpHeader.CONTENT_LENGTH, String.valueOf(content.getBytes("UTF-8").length));
                 out.write(content.substring(1).getBytes("UTF-8"));
                 out.flush();
                 out.close();
-                return;
+                callback.succeeded();
+                return true;
             }
 
-            response.setStatus(200);
+            response.setStatus(HttpStatus.OK_200);
             out.flush();
             out.close();
+            callback.succeeded();
+            return true;
         }
     }
 
     @Test(groups = { "standalone", "default_provider" }, enabled = false)
     public void basicAuthTimeoutTest() throws Exception {
-        setUpServer(Constraint.__BASIC_AUTH);
+        setUpServer("BASIC");
         AsyncHttpClientConfig config = new AsyncHttpClientConfig.Builder().setPooledConnectionIdleTimeout(2000).setConnectTimeout(20000).setRequestTimeout(2000).build();
 
         try (AsyncHttpClient client = getAsyncHttpClient(config)) {
@@ -148,7 +144,7 @@ public abstract class AuthTimeoutTest extends AbstractBasicTest {
 
     @Test(groups = { "standalone", "default_provider" }, enabled = false)
     public void basicPreemptiveAuthTimeoutTest() throws Exception {
-        setUpServer(Constraint.__BASIC_AUTH);
+        setUpServer("BASIC");
         AsyncHttpClientConfig config = new AsyncHttpClientConfig.Builder().setPooledConnectionIdleTimeout(2000).setConnectTimeout(20000).setRequestTimeout(2000).build();
 
         try (AsyncHttpClient client = getAsyncHttpClient(config)) {
@@ -164,7 +160,7 @@ public abstract class AuthTimeoutTest extends AbstractBasicTest {
 
     @Test(groups = { "standalone", "default_provider" }, enabled = false)
     public void digestAuthTimeoutTest() throws Exception {
-        setUpServer(Constraint.__DIGEST_AUTH);
+        setUpServer("DIGEST");
         AsyncHttpClientConfig config = new AsyncHttpClientConfig.Builder().setPooledConnectionIdleTimeout(2000).setConnectTimeout(20000).setRequestTimeout(2000).build();
 
         try (AsyncHttpClient client = getAsyncHttpClient(config)) {
@@ -180,7 +176,7 @@ public abstract class AuthTimeoutTest extends AbstractBasicTest {
 
     @Test(groups = { "standalone", "default_provider" }, enabled = false)
     public void digestPreemptiveAuthTimeoutTest() throws Exception {
-        setUpServer(Constraint.__DIGEST_AUTH);
+        setUpServer("DIGEST");
         AsyncHttpClientConfig config = new AsyncHttpClientConfig.Builder().setPooledConnectionIdleTimeout(2000).setConnectTimeout(20000).setRequestTimeout(2000).build();
 
         try (AsyncHttpClient client = getAsyncHttpClient(config)) {
@@ -194,7 +190,7 @@ public abstract class AuthTimeoutTest extends AbstractBasicTest {
 
     @Test(groups = { "standalone", "default_provider" }, enabled = false)
     public void basicFutureAuthTimeoutTest() throws Exception {
-        setUpServer(Constraint.__BASIC_AUTH);
+        setUpServer("BASIC");
         AsyncHttpClientConfig config = new AsyncHttpClientConfig.Builder().setPooledConnectionIdleTimeout(2000).setConnectTimeout(20000).setRequestTimeout(2000).build();
 
         try (AsyncHttpClient client = getAsyncHttpClient(config)) {
@@ -208,7 +204,7 @@ public abstract class AuthTimeoutTest extends AbstractBasicTest {
 
     @Test(groups = { "standalone", "default_provider" }, enabled = false)
     public void basicFuturePreemptiveAuthTimeoutTest() throws Exception {
-        setUpServer(Constraint.__BASIC_AUTH);
+        setUpServer("BASIC");
         AsyncHttpClientConfig config = new AsyncHttpClientConfig.Builder().setPooledConnectionIdleTimeout(2000).setConnectTimeout(20000).setRequestTimeout(2000).build();
 
         try (AsyncHttpClient client = getAsyncHttpClient(config)) {
@@ -222,7 +218,7 @@ public abstract class AuthTimeoutTest extends AbstractBasicTest {
 
     @Test(groups = { "standalone", "default_provider" }, enabled = false)
     public void digestFutureAuthTimeoutTest() throws Exception {
-        setUpServer(Constraint.__DIGEST_AUTH);
+        setUpServer("DIGEST");
         AsyncHttpClientConfig config = new AsyncHttpClientConfig.Builder().setPooledConnectionIdleTimeout(2000).setConnectTimeout(20000).setRequestTimeout(2000).build();
 
         try (AsyncHttpClient client = getAsyncHttpClient(config)) {
@@ -236,7 +232,7 @@ public abstract class AuthTimeoutTest extends AbstractBasicTest {
 
     @Test(groups = { "standalone", "default_provider" }, enabled = false)
     public void digestFuturePreemptiveAuthTimeoutTest() throws Exception {
-        setUpServer(Constraint.__DIGEST_AUTH);
+        setUpServer("DIGEST");
         AsyncHttpClientConfig config = new AsyncHttpClientConfig.Builder().setPooledConnectionIdleTimeout(2000).setConnectTimeout(20000).setRequestTimeout(2000).build();
 
         try (AsyncHttpClient client = getAsyncHttpClient(config)) {
@@ -272,7 +268,7 @@ public abstract class AuthTimeoutTest extends AbstractBasicTest {
     }
 
     @Override
-    public AbstractHandler configureHandler() throws Exception {
+    public Handler.Abstract configureHandler() throws Exception {
         return new SimpleHandler();
     }
 }

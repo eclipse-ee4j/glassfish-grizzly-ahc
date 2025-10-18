@@ -1,4 +1,5 @@
 /*
+ * Copyright (c) 2025 Contributors to the Eclipse Foundation.
  * Copyright (c) 2017, 2018 Oracle and/or its affiliates. All rights reserved.
  * Copyright 2010 Ning, Inc.
  *
@@ -20,17 +21,17 @@ package com.ning.http.client.async;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNotNull;
 
-import java.io.IOException;
 import java.io.OutputStream;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 
-import javax.servlet.ServletException;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
-
+import org.eclipse.jetty.http.HttpFields;
+import org.eclipse.jetty.http.HttpHeader;
+import org.eclipse.jetty.http.HttpStatus;
+import org.eclipse.jetty.io.Content;
+import org.eclipse.jetty.server.Handler;
 import org.eclipse.jetty.server.Request;
-import org.eclipse.jetty.server.handler.AbstractHandler;
+import org.eclipse.jetty.util.Callback;
 import org.testng.annotations.Test;
 
 import com.ning.http.client.AsyncHttpClient;
@@ -44,22 +45,28 @@ import com.ning.http.client.Response;
 public abstract class ErrorResponseTest extends AbstractBasicTest {
     final static String BAD_REQUEST_STR = "Very Bad Request! No cookies.";
 
-    private static class ErrorHandler extends AbstractHandler {
-        public void handle(String s, Request r, HttpServletRequest request, HttpServletResponse response) throws IOException, ServletException {
+    private static class ErrorHandler extends Handler.Abstract {
+        @Override
+        public boolean handle(Request request, org.eclipse.jetty.server.Response response, Callback callback)
+                throws Exception {
             try {
                 Thread.sleep(210L);
             } catch (InterruptedException e) {
             }
-            response.setContentType("text/plain");
-            response.setStatus(400);
-            OutputStream out = response.getOutputStream();
-            out.write(BAD_REQUEST_STR.getBytes("UTF-8"));
-            out.flush();
+            final HttpFields.Mutable responseHeaders = response.getHeaders();
+            responseHeaders.put(HttpHeader.CONTENT_TYPE, "text/plain");
+            response.setStatus(HttpStatus.BAD_REQUEST_400);
+            try (final OutputStream out = Content.Sink.asOutputStream(response)) {
+                out.write(BAD_REQUEST_STR.getBytes("UTF-8"));
+                out.flush();
+            }
+            callback.succeeded();
+            return true;
         }
     }
 
     @Override
-    public AbstractHandler configureHandler() throws Exception {
+    public Handler.Abstract configureHandler() throws Exception {
         return new ErrorHandler();
     }
 
