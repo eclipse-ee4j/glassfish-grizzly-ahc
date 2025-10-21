@@ -519,7 +519,7 @@
         <maven.compiler.target>1.8</maven.compiler.target>
         <maven.compiler.release>8</maven.compiler.release>
         <surefire.version>3.5.4</surefire.version>
-        <jetty.version>12.1.2</jetty.version>
+        <jetty.version>12.1.3</jetty.version>
         <slf4j.version>2.0.17</slf4j.version>
         <log4j.version>2.25.2</log4j.version>
     </properties>
