@@ -24,7 +24,7 @@
     <parent>
         <groupId>org.eclipse.ee4j</groupId>
         <artifactId>project</artifactId>
-        <version>1.0.9</version>
+        <version>2.0.0-M1</version>
     </parent>
     <modelVersion>4.0.0</modelVersion>
     <groupId>org.glassfish.grizzly</groupId>
@@ -36,23 +36,26 @@
         The Grizzly Async Http Client library purpose is to allow Java applications to easily execute HTTP requests and
         asynchronously process the HTTP responses.
     </description>
-    <url>https://github.com/eclipse-ee4j/grizzly-ahc</url>
+    <url>https://github.com/eclipse-ee4j/glassfish-grizzly-ahc</url>
     <scm>
-        <connection>scm:git:https://github.com/eclipse-ee4j/grizzly-ahc.git</connection>
+        <connection>scm:git:https://github.com/eclipse-ee4j/glassfish-grizzly-ahc.git</connection>
         <developerConnection>
-            scm:git:git@github.com:eclipse-ee4j/grizzly-ahc.git
+            scm:git:git@github.com:eclipse-ee4j/glassfish-grizzly-ahc.git
         </developerConnection>
-        <url>https://github.com/eclipse-ee4j/grizzly-ahc</url>
+        <url>https://github.com/eclipse-ee4j/glassfish-grizzly-ahc</url>
       <tag>HEAD</tag>
   </scm>
     <issueManagement>
         <system>GitHub</system>
-        <url>https://github.com/eclipse-ee4j/grizzly-ahc/issues</url>
+        <url>https://github.com/eclipse-ee4j/glassfish-grizzly-ahc/issues</url>
     </issueManagement>
     <mailingLists>
         <mailingList>
-            <name>Grizzly Dev List</name>
-            <archive>grizzly-dev@eclipse.org</archive>
+            <name>GlassFish mailing list</name>
+            <post>glassfish-dev@eclipse.org</post>
+            <subscribe>https://dev.eclipse.org/mailman/listinfo/glassfish-dev</subscribe>
+            <unsubscribe>https://dev.eclipse.org/mailman/listinfo/glassfish-dev</unsubscribe>
+            <archive>https://dev.eclipse.org/mhonarc/lists/glassfish-dev/</archive>
         </mailingList>
     </mailingLists>
 
@@ -94,6 +97,11 @@
         </contributor>
     </contributors>
     <licenses>
+        <license>
+            <name>Eclipse Public License v. 2.0</name>
+            <url>https://www.eclipse.org/org/documents/epl-2.0/EPL-2.0.txt</url>
+            <distribution>repo</distribution>
+        </license>
         <license>
             <name>Apache License 2.0</name>
             <url>http://www.apache.org/licenses/LICENSE-2.0.html</url>
@@ -219,8 +227,6 @@
                 <artifactId>maven-surefire-plugin</artifactId>
                 <version>${surefire.version}</version>
                 <configuration>
-                    <!--<argLine>-Dorg.jboss.netty.tryUnsafe=true</argLine>-->
-                    <redirectTestOutputToFile>${surefire.redirectTestOutputToFile}</redirectTestOutputToFile>
                     <argLine>
                         --add-opens java.base/java.lang=ALL-UNNAMED
                     </argLine>
@@ -258,19 +264,16 @@
             <plugin>
                 <groupId>org.apache.felix</groupId>
                 <artifactId>maven-bundle-plugin</artifactId>
-                <version>3.5.1</version>
+                <version>6.0.0</version>
                 <extensions>true</extensions>
                 <configuration>
                     <manifestLocation>META-INF</manifestLocation>
                     <instructions>
-                        <Bundle-Version>$(replace;$(project.version);-SNAPSHOT;.$(tstamp;yyyyMMdd-HHmm))
-                        </Bundle-Version>
-                        <Bundle-Vendor>Sonatype</Bundle-Vendor>
                         <Import-Package>
                             *
                         </Import-Package>
                         <Export-Package>
-                            com.ning.http.*;version="$(replace;$(project.version);-SNAPSHOT;"")"
+                            com.ning.http.*;version=${project.version},
                         </Export-Package>
                     </instructions>
                 </configuration>
@@ -294,31 +297,6 @@
             </plugin>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-release-plugin</artifactId>
-                <version>3.1.1</version>
-                <configuration>
-                    <mavenExecutorId>forked-path</mavenExecutorId>
-                    <autoVersionSubmodules>true</autoVersionSubmodules>
-                    <preparationGoals>clean install</preparationGoals>
-                    <useReleaseProfile>false</useReleaseProfile>
-                    <pushChanges>false</pushChanges>
-                    <arguments>${release.arguments}</arguments>
-                </configuration>
-             </plugin>
-             <plugin>
-                 <groupId>org.sonatype.plugins</groupId>
-                 <artifactId>nexus-staging-maven-plugin</artifactId>
-                     <version>1.7.0</version>
-                     <configuration>
-                         <serverId>ossrh</serverId>
-                         <nexusUrl>https://oss.sonatype.org/</nexusUrl>
-                         <autoReleaseAfterClose>false</autoReleaseAfterClose>
-                         <!-- Skip based on the maven.deploy.skip property -->
-                         <skipNexusStagingDeployMojo>${maven.deploy.skip}</skipNexusStagingDeployMojo>
-                     </configuration>
-            </plugin>
-            <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-jar-plugin</artifactId>
                 <version>3.4.2</version>
                 <executions>
@@ -337,7 +315,7 @@
                     <execution>
                         <id>attach-sources</id>
                         <goals>
-                            <goal>jar</goal>
+                            <goal>jar-no-fork</goal>
                         </goals>
                     </execution>
                 </executions>
@@ -352,14 +330,10 @@
                 <artifactId>maven-javadoc-plugin</artifactId>
                 <version>3.12.0</version>
                 <configuration>
-                    <aggregate>true</aggregate>
                     <doclint>none</doclint>
                     <source>${maven.compiler.source}</source>
                     <encoding>UTF-8</encoding>
                     <maxmemory>1g</maxmemory>
-                    <links>
-                        <link>http://java.sun.com/javase/6/docs/api/</link>
-                    </links>
                 </configuration>
                 <executions>
                     <execution>
@@ -379,14 +353,9 @@
                 <artifactId>maven-javadoc-plugin</artifactId>
                 <version>3.12.0</version>
                 <configuration>
-                    <aggregate>true</aggregate>
                     <source>${maven.compiler.source}</source>
                     <encoding>UTF-8</encoding>
                     <maxmemory>1g</maxmemory>
-                    <links>
-                        <link>http://java.sun.com/javase/7/docs/api/</link>
-                    </links>
-                    <bootclasspath>${sun.boot.class.path}</bootclasspath>
                     <doclet>com.google.doclava.Doclava</doclet>
                     <useStandardDocletOptions>false</useStandardDocletOptions>
                     <additionalJOption>-J-Xmx1024m</additionalJOption>
@@ -395,10 +364,14 @@
                         <artifactId>doclava</artifactId>
                         <version>1.0.3</version>
                     </docletArtifact>
-                    <additionalparam>
-                        -hdf project.name "${project.name} ${project.version}"
-                        -d ${project.reporting.outputDirectory}/apidocs
-                    </additionalparam>
+                    <additionalOptions>
+                        <additionalOption>
+                            -hdf project.name "${project.name} ${project.version}"
+                        </additionalOption>
+                        <additionalOption>
+                            -d ${project.reporting.outputDirectory}/apidocs
+                        </additionalOption>
+                    </additionalOptions>
                 </configuration>
                 <reportSets>
                     <reportSet>
@@ -417,66 +390,6 @@
         </plugins>
     </reporting>
     <profiles>
-        <profile>
-            <id>release</id>
-            <build>
-                <plugins>
-                    <plugin>
-                        <groupId>org.apache.maven.plugins</groupId>
-                        <artifactId>maven-enforcer-plugin</artifactId>
-                        <executions>
-                            <execution>
-                                <id>enforce-maven</id>
-                                <goals>
-                                    <goal>enforce</goal>
-                                </goals>
-                                <configuration>
-                                    <rules>
-                                        <requireJavaVersion>
-                                            <version>[17,)</version>
-                                        </requireJavaVersion>
-                                        <requireMavenVersion>
-                                            <version>[3.6.3,)</version>
-                                        </requireMavenVersion>
-                                    </rules>
-                                </configuration>
-                            </execution>
-                        </executions>
-                    </plugin>
-                    <plugin>
-                        <groupId>org.apache.maven.plugins</groupId>
-                        <artifactId>maven-source-plugin</artifactId>
-                        <executions>
-                            <execution>
-                                <id>attach-sources</id>
-                                <goals>
-                                    <goal>jar</goal>
-                                </goals>
-                            </execution>
-                        </executions>
-                    </plugin>
-                    <plugin>
-                        <groupId>org.apache.maven.plugins</groupId>
-                        <artifactId>maven-gpg-plugin</artifactId>
-                        <version>3.2.8</version>
-                        <executions>
-                            <execution>
-                                <id>sign-artifacts</id>
-                                <phase>verify</phase>
-                                <goals>
-                                    <goal>sign</goal>
-                                </goals>
-                            </execution>
-                        </executions>
-                    </plugin>
-                    <plugin>
-                        <groupId>org.sonatype.plugins</groupId>
-                        <artifactId>nexus-staging-maven-plugin</artifactId>
-                        <extensions>true</extensions>
-                    </plugin>
-                </plugins>
-            </build>
-        </profile>
         <profile>
             <id>offline-testing</id>
             <build>
