@@ -1,4 +1,5 @@
 /*
+ * Copyright (c) 2025 Contributors to the Eclipse Foundation.
  * Copyright (c) 2017, 2018 Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2010-2012 Sonatype, Inc. All rights reserved.
  *
@@ -34,6 +35,7 @@ import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Files;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 
@@ -118,7 +120,7 @@ public abstract class SimpleAsyncHttpClientTest extends AbstractBasicTest {
         SimpleAsyncHttpClient client = new SimpleAsyncHttpClient.Builder().setProviderClass(getProviderClass()).setPooledConnectionIdleTimeout(100).setMaximumConnectionsTotal(50).setRequestTimeout(5 * 1000).setUrl(getTargetUrl() + "/testPutZeroBytesFileTest.txt").setHeader("Content-Type", "text/plain")
                 .build();
         try {
-            File tmpfile = File.createTempFile("testPutZeroBytesFile", ".tmp");
+            final File tmpfile = Files.createTempFile("testPutZeroBytesFile", ".tmp").toFile();
             tmpfile.deleteOnExit();
 
             Future<Response> future = client.put(new FileBodyGenerator(tmpfile));

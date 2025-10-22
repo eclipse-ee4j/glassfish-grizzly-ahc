@@ -1,4 +1,5 @@
 /*
+ * Copyright (c) 2025 Contributors to the Eclipse Foundation.
  * Copyright (c) 2017, 2018 Oracle and/or its affiliates. All rights reserved.
  * Copyright 2010 Ning, Inc.
  *
@@ -35,6 +36,7 @@ import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
 import java.nio.channels.SocketChannel;
 import java.nio.channels.WritableByteChannel;
+import java.security.SecureRandom;
 import java.util.List;
 import java.util.Random;
 import java.util.Set;
@@ -95,7 +97,7 @@ public class MultipartUtils {
     }
 
     private static byte[] generateMultipartBoundary() {
-        Random rand = new Random();
+        Random rand = new SecureRandom();
         byte[] bytes = new byte[rand.nextInt(11) + 30]; // a random size from 30 to 40
         for (int i = 0; i < bytes.length; i++) {
             bytes[i] = MULTIPART_CHARS[rand.nextInt(MULTIPART_CHARS.length)];
