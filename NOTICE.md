@@ -2,7 +2,7 @@
 
 This content is produced and maintained by the Eclipse Grizzly project.
 
-* Project home: https://projects.eclipse.org/projects/ee4j.grizzly
+* Project home: https://projects.eclipse.org/projects/ee4j.glassfish
 
 ## Trademarks
 

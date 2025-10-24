@@ -10,14 +10,14 @@ management issues made it impossible for a server to scale to thousands of
 users. The Eclipse Grizzly NIO framework has been designed to help developers to
 take advantage of the Java™ NIO API.
 
-* https://projects.eclipse.org/projects/ee4j.grizzly
+* https://projects.eclipse.org/projects/ee4j.glassfish
 
 ## Developer resources
 
 Information regarding source code management, builds, coding standards, and
 more.
 
-* https://projects.eclipse.org/projects/ee4j.grizzly/developer
+* https://projects.eclipse.org/projects/ee4j.glassfish/developer
 
 The project maintains the following source code repositories
 
