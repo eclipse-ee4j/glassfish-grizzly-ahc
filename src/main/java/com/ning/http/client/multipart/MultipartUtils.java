@@ -36,10 +36,10 @@ import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
 import java.nio.channels.SocketChannel;
 import java.nio.channels.WritableByteChannel;
-import java.security.SecureRandom;
 import java.util.List;
 import java.util.Random;
 import java.util.Set;
+import java.util.concurrent.ThreadLocalRandom;
 
 public class MultipartUtils {
 
@@ -97,7 +97,7 @@ public class MultipartUtils {
     }
 
     private static byte[] generateMultipartBoundary() {
-        Random rand = new SecureRandom();
+        final Random rand = ThreadLocalRandom.current();
         byte[] bytes = new byte[rand.nextInt(11) + 30]; // a random size from 30 to 40
         for (int i = 0; i < bytes.length; i++) {
             bytes[i] = MULTIPART_CHARS[rand.nextInt(MULTIPART_CHARS.length)];
