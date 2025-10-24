@@ -1,4 +1,5 @@
 /*
+ * Copyright (c) 2025 Contributors to the Eclipse Foundation.
  * Copyright (c) 2017, 2018 Oracle and/or its affiliates. All rights reserved.
  * Copyright 2010 Ning, Inc.
  *
@@ -17,8 +18,13 @@
 
 package com.ning.http.util;
 
+import com.ning.http.client.Param;
+import com.ning.http.client.uri.Uri;
 import org.testng.Assert;
 import org.testng.annotations.Test;
+
+import java.util.Arrays;
+import java.util.List;
 
 public class UTF8UrlCodecTest {
 
@@ -62,5 +68,33 @@ public class UTF8UrlCodecTest {
         } catch (StringIndexOutOfBoundsException ex) {
             Assert.assertTrue(false, "String Index Out of Bound thrown, but should be IllegalArgument");
         }
+    }
+
+    @Test(groups = "fast")
+    public void testUriEncoder() {
+        // This is not affected by URI encoding. The result is the same whether disableUrlEncoding is true or false.
+        final Uri uriWithoutQuery = Uri.create("http://example.com:8080/path");
+        final Uri uriWithQuery = Uri.create("https://example.com/path?query1=val1&query2=val2");
+        final List<Param> additionalQueryParams =
+                Arrays.asList(new Param("addQuery1", "addVal1"), new Param("addQuery2", "addVal2"));
+
+        Assert.assertEquals(UriEncoder.uriEncoder(true).encode(uriWithoutQuery, null).toString(),
+                            "http://example.com:8080/path");
+        Assert.assertEquals(UriEncoder.uriEncoder(true).encode(uriWithQuery, null).toString(),
+                            "https://example.com/path?query1=val1&query2=val2");
+        Assert.assertEquals(UriEncoder.uriEncoder(true).encode(uriWithoutQuery, additionalQueryParams).toString(),
+                            "http://example.com:8080/path?addQuery1=addVal1&addQuery2=addVal2");
+        Assert.assertEquals(UriEncoder.uriEncoder(true).encode(uriWithQuery, additionalQueryParams).toString(),
+                            "https://example.com/path?query1=val1&query2=val2&addQuery1=addVal1&addQuery2=addVal2");
+
+        // So we expect the same result whether it's UriEncoder.RAW or UriEncoder.FIXING.
+        Assert.assertEquals(UriEncoder.uriEncoder(true).encode(uriWithoutQuery, null),
+                            UriEncoder.uriEncoder(false).encode(uriWithoutQuery, null));
+        Assert.assertEquals(UriEncoder.uriEncoder(true).encode(uriWithQuery, null),
+                            UriEncoder.uriEncoder(false).encode(uriWithQuery, null));
+        Assert.assertEquals(UriEncoder.uriEncoder(true).encode(uriWithoutQuery, additionalQueryParams),
+                            UriEncoder.uriEncoder(false).encode(uriWithoutQuery, additionalQueryParams));
+        Assert.assertEquals(UriEncoder.uriEncoder(true).encode(uriWithQuery, additionalQueryParams),
+                            UriEncoder.uriEncoder(false).encode(uriWithQuery, additionalQueryParams));
     }
 }
