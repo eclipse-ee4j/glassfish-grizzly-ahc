@@ -126,7 +126,7 @@ public abstract class RedirectConnectionUsageTest extends AbstractBasicTest{
                 Response res = null;
                 res = response.get();
                 assertNotNull(res.getResponseBody());
-                assertEquals(BASE_URL + "/overthere", BASE_URL + "/overthere", res.getUri().toString());
+                assertEquals(res.getUri().toString(), BASE_URL + "/overthere");
 
             } catch (Exception e) {
                 System.err.print("============");
