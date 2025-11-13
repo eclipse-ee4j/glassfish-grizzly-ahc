@@ -62,7 +62,7 @@ public abstract class RetryRequestTest extends AbstractBasicTest {
                 }
 
                 if (i > load / 10) {
-                    Response.writeError(request, response, callback, HttpStatus.INTERNAL_SERVER_ERROR_500);
+                    Response.writeError(request, response, null, HttpStatus.INTERNAL_SERVER_ERROR_500);
                 }
             }
 
