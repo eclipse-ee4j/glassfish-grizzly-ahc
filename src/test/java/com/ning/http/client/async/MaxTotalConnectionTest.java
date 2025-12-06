@@ -40,21 +40,21 @@ public abstract class MaxTotalConnectionTest extends AbstractBasicTest {
 
     @Test(groups = { "standalone", "default_provider" })
     public void testMaxTotalConnectionsExceedingException() throws IOException {
-        String[] urls = new String[] { "http://google.com", "http://github.com/" };
+        final String url = getTargetUrl();
 
         AsyncHttpClientConfig config = new AsyncHttpClientConfig.Builder().setConnectTimeout(1000)
-                .setRequestTimeout(5000).setAllowPoolingConnections(false).setMaxConnections(1).setMaxConnectionsPerHost(1)
+                .setRequestTimeout(5000).setAllowPoolingConnections(false).setMaxConnections(1).setMaxConnectionsPerHost(-1)
                 .build();
 
         try (AsyncHttpClient client = getAsyncHttpClient(config)) {
             List<ListenableFuture<Response>> futures = new ArrayList<>();
-            for (int i = 0; i < urls.length; i++) {
-                futures.add(client.prepareGet(urls[i]).execute());
+            for (int i = 0; i < 2; i++) {
+                futures.add(client.prepareGet(url).execute());
             }
             
             boolean caughtError = false;
             int i;
-            for (i = 0; i < urls.length; i++) {
+            for (i = 0; i < futures.size(); i++) {
                 try {
                     futures.get(i).get();
                 } catch (Exception e) {
