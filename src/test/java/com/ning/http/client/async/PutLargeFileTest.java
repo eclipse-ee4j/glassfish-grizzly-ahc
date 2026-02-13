@@ -32,6 +32,7 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.file.Files;
 import java.util.UUID;
 
 /**
@@ -115,7 +116,7 @@ public abstract class PutLargeFileTest extends AbstractBasicTest {
     public static File createTempFile(byte[] pattern, int repeat) throws IOException {
         TMP.mkdirs();
         TMP.deleteOnExit();
-        File tmpFile = File.createTempFile("tmpfile-", ".data", TMP);
+        final File tmpFile = Files.createTempFile(TMP.toPath(), "tmpfile-", ".data").toFile();
         tmpFile.deleteOnExit();
         write(pattern, repeat, tmpFile);
 
