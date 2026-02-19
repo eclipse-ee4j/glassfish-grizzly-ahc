@@ -427,7 +427,7 @@
     </profiles>
 
     <properties>
-        <grizzly.version>4.0.2</grizzly.version>
+        <grizzly.version>5.0.0</grizzly.version>
         <maven.compiler.source>1.8</maven.compiler.source>
         <maven.compiler.target>1.8</maven.compiler.target>
         <maven.compiler.release>8</maven.compiler.release>
