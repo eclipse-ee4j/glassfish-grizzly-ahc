@@ -396,7 +396,7 @@
         <surefire.version>3.5.5</surefire.version>
         <jetty.version>12.1.9</jetty.version>
         <slf4j.version>2.0.17</slf4j.version>
-        <log4j.version>2.25.4</log4j.version>
+        <log4j.version>2.26.0</log4j.version>
     </properties>
 </project>
 
