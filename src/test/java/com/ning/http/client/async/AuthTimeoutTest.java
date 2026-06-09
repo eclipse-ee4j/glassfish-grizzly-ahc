@@ -85,7 +85,7 @@ public abstract class AuthTimeoutTest extends AbstractBasicTest {
             authenticator = new BasicAuthenticator();
         } else if (auth != null && auth.equals("DIGEST")) {
             final DigestAuthenticator digestAuthenticator = new DigestAuthenticator();
-            digestAuthenticator.setAlgorithm("MD5");
+            digestAuthenticator.setAlgorithm(Realm.DigestAlgorithm.MD5.toString());
             authenticator = digestAuthenticator;
         } else {
             authenticator = new BasicAuthenticator();
