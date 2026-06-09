@@ -391,7 +391,7 @@
     </profiles>
 
     <properties>
-        <grizzly.version>5.0.1</grizzly.version>
+        <grizzly.version>5.0.2</grizzly.version>
         <maven.compiler.release>21</maven.compiler.release>
         <surefire.version>3.5.5</surefire.version>
         <jetty.version>12.1.9</jetty.version>
