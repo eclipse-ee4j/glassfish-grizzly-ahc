@@ -1,4 +1,5 @@
 /*
+ * Copyright (c) 2026 Contributors to the Eclipse Foundation.
  * Copyright (c) 2017, 2018 Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2010-2012 Sonatype, Inc. All rights reserved.
  *
@@ -172,12 +173,23 @@ public abstract class MultipleHeaderTest extends AbstractBasicTest {
                     socket.shutdownInput();
                     if (req.endsWith("MultiEnt")) {
                         OutputStreamWriter outputStreamWriter = new OutputStreamWriter(socket.getOutputStream());
-                        outputStreamWriter.append("HTTP/1.0 200 OK\n" + "Connection: close\n" + "Content-Type: text/plain; charset=iso-8859-1\n" + "Content-Length: 2\n" + "Content-Length: 1\n" + "\n0\n");
+                        outputStreamWriter.append("HTTP/1.0 200 OK\n");
+                        outputStreamWriter.append("Connection: close\r\n");
+                        outputStreamWriter.append("Content-Type: text/plain; charset=iso-8859-1\r\n");
+                        outputStreamWriter.append("Content-Length: 2\r\n");
+                        outputStreamWriter.append("Content-Length: 1\r\n");
+                        outputStreamWriter.append("\n0\n");
                         outputStreamWriter.flush();
                         socket.shutdownOutput();
                     } else if (req.endsWith("MultiOther")) {
                         OutputStreamWriter outputStreamWriter = new OutputStreamWriter(socket.getOutputStream());
-                        outputStreamWriter.append("HTTP/1.0 200 OK\n" + "Connection: close\n" + "Content-Type: text/plain; charset=iso-8859-1\n" + "Content-Length: 1\n" + "X-Forwarded-For: abc\n" + "X-Forwarded-For: def\n" + "\n0\n");
+                        outputStreamWriter.append("HTTP/1.0 200 OK\n");
+                        outputStreamWriter.append("Connection: close\r\n");
+                        outputStreamWriter.append("Content-Type: text/plain; charset=iso-8859-1\r\n");
+                        outputStreamWriter.append("Content-Length: 1\r\n");
+                        outputStreamWriter.append("X-Forwarded-For: abc\r\n");
+                        outputStreamWriter.append("X-Forwarded-For: def\r\n");
+                        outputStreamWriter.append("\n0\n");
                         outputStreamWriter.flush();
                         socket.shutdownOutput();
                     }
