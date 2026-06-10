@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2025 Contributors to the Eclipse Foundation.
+ * Copyright (c) 2025, 2026 Contributors to the Eclipse Foundation.
  * Copyright (c) 2017, 2020 Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2010-2012 Sonatype, Inc. All rights reserved.
  *
@@ -84,7 +84,9 @@ public abstract class AuthTimeoutTest extends AbstractBasicTest {
         if (auth != null && auth.equals("BASIC")) {
             authenticator = new BasicAuthenticator();
         } else if (auth != null && auth.equals("DIGEST")) {
-            authenticator = new DigestAuthenticator();
+            final DigestAuthenticator digestAuthenticator = new DigestAuthenticator();
+            digestAuthenticator.setAlgorithm("MD5");
+            authenticator = digestAuthenticator;
         } else {
             authenticator = new BasicAuthenticator();
         }
