@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2025 Contributors to the Eclipse Foundation.
+ * Copyright (c) 2025, 2026 Contributors to the Eclipse Foundation.
  * Copyright (c) 2017, 2020 Oracle and/or its affiliates. All rights reserved.
  * Copyright 2010 Ning, Inc.
  *
@@ -161,7 +161,9 @@ public abstract class BasicAuthTest extends AbstractBasicTest {
             }
         };
         _securityHandler.put("/*", Constraint.from("DIGEST", Constraint.Authorization.SPECIFIC_ROLE, user, admin));
-        _securityHandler.setAuthenticator(new DigestAuthenticator());
+        final DigestAuthenticator digestAuthenticator = new DigestAuthenticator();
+        digestAuthenticator.setAlgorithm("MD5");
+        _securityHandler.setAuthenticator(digestAuthenticator);
         _securityHandler.setLoginService(loginService);
         _securityHandler.setHandler(new RedirectHandler());
 

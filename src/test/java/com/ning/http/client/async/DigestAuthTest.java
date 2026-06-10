@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2025 Contributors to the Eclipse Foundation.
+ * Copyright (c) 2025, 2026 Contributors to the Eclipse Foundation.
  * Copyright (c) 2017, 2020 Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2010-2012 Sonatype, Inc. All rights reserved.
  *
@@ -73,7 +73,9 @@ public abstract class DigestAuthTest extends AbstractBasicTest {
 
         final SecurityHandler.PathMapped _securityHandler = new SecurityHandler.PathMapped();
         _securityHandler.put("/*", Constraint.from("BASIC", Constraint.Authorization.SPECIFIC_ROLE, user, admin));
-        _securityHandler.setAuthenticator(new DigestAuthenticator());
+        final DigestAuthenticator digestAuthenticator = new DigestAuthenticator();
+        digestAuthenticator.setAlgorithm("MD5");
+        _securityHandler.setAuthenticator(digestAuthenticator);
         _securityHandler.setLoginService(loginService);
         _securityHandler.setHandler(configureHandler());
         server.setHandler(_securityHandler);
