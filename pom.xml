@@ -312,25 +312,15 @@
     <reporting>
         <plugins>
             <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-javadoc-plugin</artifactId>
                 <version>3.12.0</version>
                 <configuration>
+                    <doclint>-missing</doclint>
                     <release>${maven.compiler.release}</release>
                     <encoding>UTF-8</encoding>
                     <maxmemory>1g</maxmemory>
-                    <doclet>com.google.doclava.Doclava</doclet>
-                    <useStandardDocletOptions>false</useStandardDocletOptions>
                     <additionalJOption>-J-Xmx1024m</additionalJOption>
-                    <docletArtifact>
-                        <groupId>com.google.doclava</groupId>
-                        <artifactId>doclava</artifactId>
-                        <version>1.0.3</version>
-                    </docletArtifact>
                     <additionalOptions>
-                        <additionalOption>
-                            -hdf project.name "${project.name} ${project.version}"
-                        </additionalOption>
                         <additionalOption>
                             -d ${project.reporting.outputDirectory}/apidocs
                         </additionalOption>
@@ -346,7 +336,6 @@
                 </reportSets>
             </plugin>
             <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-surefire-report-plugin</artifactId>
                 <version>${surefire.version}</version>
             </plugin>
