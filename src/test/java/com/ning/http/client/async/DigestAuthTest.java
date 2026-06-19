@@ -51,6 +51,12 @@ public abstract class DigestAuthTest extends AbstractBasicTest {
     private final static String user = "user";
     private final static String admin = "admin";
 
+    private Realm.DigestAlgorithm digestAlgorithm;
+
+    public DigestAuthTest(final Realm.DigestAlgorithm digestAlgorithm) {
+        this.digestAlgorithm = digestAlgorithm;
+    }
+
     @BeforeClass(alwaysRun = true)
     @Override
     public void setUpGlobal() throws Exception {
@@ -74,7 +80,7 @@ public abstract class DigestAuthTest extends AbstractBasicTest {
         final SecurityHandler.PathMapped _securityHandler = new SecurityHandler.PathMapped();
         _securityHandler.put("/*", Constraint.from("BASIC", Constraint.Authorization.SPECIFIC_ROLE, user, admin));
         final DigestAuthenticator digestAuthenticator = new DigestAuthenticator();
-        digestAuthenticator.setAlgorithm("MD5");
+        digestAuthenticator.setAlgorithm(digestAlgorithm.toString());
         _securityHandler.setAuthenticator(digestAuthenticator);
         _securityHandler.setLoginService(loginService);
         _securityHandler.setHandler(configureHandler());
