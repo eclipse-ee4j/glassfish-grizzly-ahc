@@ -1,4 +1,5 @@
 /*
+ * Copyright (c) 2026 Contributors to the Eclipse Foundation.
  * Copyright (c) 2017, 2018 Oracle and/or its affiliates. All rights reserved.
  * Copyright 2010 Ning, Inc.
  *
@@ -34,7 +35,6 @@ import java.util.concurrent.ThreadLocalRandom;
  */
 public class Realm {
 
-    private static final String EMPTY_ENTITY_MD5 = "d41d8cd98f00b204e9800998ecf8427e";
     private static final String DEFAULT_NC = "00000001";
 
     private final String principal;
@@ -66,6 +66,53 @@ public class Realm {
         SPNEGO,
         KERBEROS,
         NONE
+    }
+
+    public enum DigestAlgorithm {
+        MD5("MD5"), SHA_256("SHA-256"), SHA_512_256("SHA-512/256");
+
+        private final String algorithm;
+        private final ThreadLocal<MessageDigest> threadLocal;
+
+        DigestAlgorithm(final String algorithm) {
+            this.algorithm = algorithm;
+            this.threadLocal = ThreadLocal.withInitial(() -> {
+                try {
+                    return MessageDigest.getInstance(algorithm);
+                } catch (NoSuchAlgorithmException e) {
+                    throw new RuntimeException(e);
+                }
+            });
+        }
+
+        private MessageDigest getMessageDigest() {
+            final MessageDigest md = threadLocal.get();
+            md.reset();
+            return md;
+        }
+
+        @Override
+        public String toString() {
+            return algorithm;
+        }
+
+        private static MessageDigest getMessageDigest(final String algorithm) {
+            final MessageDigest md;
+            if (algorithm == null) {
+                return MD5.getMessageDigest();
+            }
+            final DigestAlgorithm digestAlgorithm;
+            try {
+                digestAlgorithm = DigestAlgorithm.valueOf(algorithm.replaceAll("[-/]", "_"));
+            } catch (IllegalArgumentException ignore) {
+                try {
+                    return MessageDigest.getInstance(algorithm);
+                } catch (NoSuchAlgorithmException e) {
+                    throw new IllegalArgumentException("Unsupported digest algorithm: " + algorithm, e);
+                }
+            }
+            return digestAlgorithm.getMessageDigest();
+        }
     }
 
     private Realm(AuthScheme scheme,
@@ -297,17 +344,6 @@ public class Realm {
         private boolean omitQuery = false;
         private boolean targetProxy = false;
 
-        private static final ThreadLocal<MessageDigest> digestThreadLocal = new ThreadLocal<MessageDigest>() {
-            @Override
-            protected MessageDigest initialValue() {
-                try {
-                    return MessageDigest.getInstance("MD5");
-                } catch (NoSuchAlgorithmException e) {
-                    throw new RuntimeException(e);
-                }
-            }
-        };
-
         public String getNtlmDomain() {
             return ntlmDomain;
         }
@@ -325,7 +361,6 @@ public class Realm {
             this.ntlmHost = host;
             return this;
         }
-
 
         public String getPrincipal() {
             return principal;
@@ -558,7 +593,11 @@ public class Realm {
         private void newCnonce(MessageDigest md) {
             byte[] b = new byte[8];
             ThreadLocalRandom.current().nextBytes(b);
-            b = md.digest(b);
+            try {
+                b = md.digest(b);
+            } finally {
+                md.reset();
+            }
             cnonce = toHexString(b);
         }
 
@@ -590,39 +629,42 @@ public class Realm {
             return this;
         }
 
-        private byte[] md5FromRecycledStringBuilder(StringBuilder sb, MessageDigest md) {
-            md.update(StringUtils.charSequence2ByteBuffer(sb, ISO_8859_1));
-            sb.setLength(0);
-            return md.digest();
+        private byte[] digestFromRecycledStringBuilder(StringBuilder sb, MessageDigest md) {
+            try {
+                md.update(StringUtils.charSequence2ByteBuffer(sb, ISO_8859_1));
+                sb.setLength(0);
+                return md.digest();
+            } finally {
+                md.reset();
+            }
         }
         
         private byte[] secretDigest(StringBuilder sb, MessageDigest md) {
             
             sb.append(principal).append(':').append(realmName).append(':').append(password);
-            byte[] ha1 = md5FromRecycledStringBuilder(sb, md);
+            byte[] ha1 = digestFromRecycledStringBuilder(sb, md);
 
-            if (algorithm == null || algorithm.equals("MD5")) {
+            if (algorithm == null || !algorithm.endsWith("-sess")) {
                 return ha1;
-            } else if ("MD5-sess".equals(algorithm)) {
+            } else {
+                // For -sess: HA1 = H(H(username:realm:password):nonce:cnonce)
                 appendBase16(sb, ha1);
                 sb.append(':').append(nonce).append(':').append(cnonce);
-                return md5FromRecycledStringBuilder(sb, md);
+                return digestFromRecycledStringBuilder(sb, md);
             }
-
-            throw new UnsupportedOperationException("Digest algorithm not supported: " + algorithm);
         }
 
         private byte[] dataDigest(StringBuilder sb, String digestUri, MessageDigest md) {
             
             sb.append(methodName).append(':').append(digestUri);
             if ("auth-int".equals(qop)) {
-                sb.append(':').append(EMPTY_ENTITY_MD5);
-
+                // Hash of empty body using the current algorithm
+                sb.append(':').append(toHexString(md.digest()));
             } else if (qop != null && !qop.equals("auth")) {
                 throw new UnsupportedOperationException("Digest qop not supported: " + qop);
             }
             
-            return md5FromRecycledStringBuilder(sb, md);
+            return digestFromRecycledStringBuilder(sb, md);
         }
         
         private void appendDataBase(StringBuilder sb) {
@@ -646,7 +688,7 @@ public class Realm {
             appendDataBase(sb);
             appendBase16(sb, dataDigest);
             
-            byte[] responseDigest = md5FromRecycledStringBuilder(sb, md);
+            byte[] responseDigest = digestFromRecycledStringBuilder(sb, md);
             response = toHexString(responseDigest);
         }
 
@@ -682,7 +724,8 @@ public class Realm {
 
             // Avoid generating
             if (isNonEmpty(nonce)) {
-                MessageDigest md = digestThreadLocal.get();
+                final MessageDigest md =
+                        DigestAlgorithm.getMessageDigest(algorithm != null ? algorithm.replace("-sess", "") : null);
                 newCnonce(md);
                 newResponse(md);
             }
