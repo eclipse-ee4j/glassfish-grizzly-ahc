@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2025 Contributors to the Eclipse Foundation.
+ * Copyright (c) 2025, 2026 Contributors to the Eclipse Foundation.
  * Copyright (c) 2017, 2018 Oracle and/or its affiliates. All rights reserved.
  * Copyright 2010 Ning, Inc.
  *
@@ -100,12 +100,12 @@ public abstract class PerRequestRelative302Test extends AbstractBasicTest {
         isSet.getAndSet(false);
         try (AsyncHttpClient client = getAsyncHttpClient(null)) {
             // once
-            Response response = client.prepareGet(getTargetUrl()).setFollowRedirects(true).setHeader("X-redirect", "http://www.stackoverflow.com/").execute().get();
+            Response response = client.prepareGet(getTargetUrl()).setFollowRedirects(true).setHeader("X-redirect", "http://www.eclipse.org/").execute().get();
 
             assertNotNull(response);
             assertEquals(response.getStatusCode(), 200);
 
-            String anyWebPage = "https://(www.)?stackoverflow.com[^:]*:443";
+            String anyWebPage = "https://(www.)?eclipse.org[^:]*:443";
             String baseUrl = getBaseUrl(response.getUri());
 
             assertTrue(baseUrl.matches(anyWebPage), "response baseUrl \'" + baseUrl +"\' does not show redirection to " + anyWebPage);
