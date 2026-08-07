@@ -1,4 +1,5 @@
 /*
+ * Copyright (c) 2026 Contributors to the Eclipse Foundation.
  * Copyright (c) 2017, 2018 Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2012 Sonatype, Inc. All rights reserved.
  *
@@ -16,14 +17,33 @@ package com.ning.http.client.async.grizzly;
 
 import com.ning.http.client.AsyncHttpClient;
 import com.ning.http.client.AsyncHttpClientConfig;
+import com.ning.http.client.Realm;
 import com.ning.http.client.async.DigestAuthTest;
 import com.ning.http.client.async.ProviderUtil;
+import org.testng.annotations.DataProvider;
+import org.testng.annotations.Factory;
+
+import java.util.Arrays;
 
 public class GrizzlyDigestAuthTest extends DigestAuthTest {
+
+    @DataProvider(name = "digestAlgorithm")
+    public Object[][] getAlgorithm() {
+        return Arrays.stream(Realm.DigestAlgorithm.values()).map(digestAlgorithm -> new Object[]{digestAlgorithm})
+                     .toArray(Object[][]::new);
+    }
+
+    public GrizzlyDigestAuthTest() {
+        this(Realm.DigestAlgorithm.MD5);
+    }
+
+    @Factory(dataProvider = "digestAlgorithm")
+    public GrizzlyDigestAuthTest(Realm.DigestAlgorithm digestAlgorithm) {
+        super(digestAlgorithm);
+    }
 
     @Override
     public AsyncHttpClient getAsyncHttpClient(AsyncHttpClientConfig config) {
         return ProviderUtil.grizzlyProvider(config);
     }
-
 }

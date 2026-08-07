@@ -162,7 +162,7 @@ public abstract class BasicAuthTest extends AbstractBasicTest {
         };
         _securityHandler.put("/*", Constraint.from("DIGEST", Constraint.Authorization.SPECIFIC_ROLE, user, admin));
         final DigestAuthenticator digestAuthenticator = new DigestAuthenticator();
-        digestAuthenticator.setAlgorithm("MD5");
+        digestAuthenticator.setAlgorithm(Realm.DigestAlgorithm.MD5.toString());
         _securityHandler.setAuthenticator(digestAuthenticator);
         _securityHandler.setLoginService(loginService);
         _securityHandler.setHandler(new RedirectHandler());
