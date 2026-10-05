@@ -380,7 +380,7 @@
     </profiles>
 
     <properties>
-        <grizzly.version>5.0.2</grizzly.version>
+        <grizzly.version>5.0.3</grizzly.version>
         <maven.compiler.release>21</maven.compiler.release>
         <surefire.version>3.6.0</surefire.version>
         <jetty.version>12.1.13</jetty.version>
