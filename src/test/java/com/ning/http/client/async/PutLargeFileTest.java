@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2025 Contributors to the Eclipse Foundation.
+ * Copyright (c) 2025, 2026 Contributors to the Eclipse Foundation.
  * Copyright (c) 2017, 2018 Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2010-2012 Sonatype, Inc. All rights reserved.
  *
@@ -32,6 +32,7 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.util.UUID;
 
@@ -39,13 +40,16 @@ import java.util.UUID;
  * @author Benjamin Hanzelmann
  */
 public abstract class PutLargeFileTest extends AbstractBasicTest {
+    protected static final byte[] TEST_BYTES =
+            "RatherLargeFileRatherLargeFileRatherLargeFileRatherLargeFile".getBytes(StandardCharsets.UTF_16);
+    protected static final long LARGE_BYTES_SIZE = 1024L * 1024L * 100L;
 
-    private File largeFile;
+    protected File largeFile;
 
     @Test(groups = { "standalone", "default_provider" }, enabled = true)
     public void testPutLargeFile() throws Exception {
-        byte[] bytes = "RatherLargeFileRatherLargeFileRatherLargeFileRatherLargeFile".getBytes("UTF-16");
-        long repeats = (1024 * 1024 * 100 / bytes.length) + 1;
+        byte[] bytes = TEST_BYTES;
+        long repeats = (LARGE_BYTES_SIZE / bytes.length) + 1;
         largeFile = createTempFile(bytes, (int) repeats);
         int timeout = (int) (largeFile.length() / 1000);
         AsyncHttpClientConfig config = new AsyncHttpClientConfig.Builder().setConnectTimeout(timeout).build();
@@ -61,7 +65,7 @@ public abstract class PutLargeFileTest extends AbstractBasicTest {
 
     @Test(groups = { "standalone", "default_provider" })
     public void testPutSmallFile() throws Exception {
-        byte[] bytes = "RatherLargeFileRatherLargeFileRatherLargeFileRatherLargeFile".getBytes("UTF-16");
+        byte[] bytes = TEST_BYTES;
         long repeats = (1024 / bytes.length) + 1;
         largeFile = createTempFile(bytes, (int) repeats);
 
